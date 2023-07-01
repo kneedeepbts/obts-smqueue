@@ -52,7 +52,7 @@
 
 using namespace std;
 
-ConfigurationTable gConfig("/etc/OpenBTS/sipauthserve.db", "sipauthserve", getConfigurationKeys());
+//ConfigurationTable gConfig("/etc/OpenBTS/sipauthserve.db", "sipauthserve", getConfigurationKeys());
 Log dummy("sipauthserve", gConfig.getStr("Log.Level").c_str(), LOG_LOCAL7);
 
 int my_udp_port;
@@ -61,7 +61,7 @@ int my_udp_port;
 SubscriberRegistry gSubscriberRegistry;
 
 /** The remote node manager. */ 
-NodeManager gNodeManager;
+//NodeManager gNodeManager;
 
 /** The JSON<->DB interface. */ 
 JSONDB gJSONDB;
@@ -299,86 +299,86 @@ char *processBuffer(char *buffer)
 
 #define BUFLEN 5000
 
-int
-main(int argc, char **argv)
-{
-	// TODO: Properly parse and handle any arguments
-	if (argc > 1) {
-		for (int argi = 0; argi < argc; argi++) {
-			if (!strcmp(argv[argi], "--version") ||
-			    !strcmp(argv[argi], "-v")) {
-				cout << gVersionString << endl;
-			}
-			if (!strcmp(argv[argi], "--gensql")) {
-				cout << gConfig.getDefaultSQL(string(argv[0]), gVersionString) << endl;
-			}
-			if (!strcmp(argv[argi], "--gentex")) {
-				cout << gConfig.getTeX(string(argv[0]), gVersionString) << endl;
-			}
-		}
-
-		return 0;
-	}
-
-	sockaddr_in si_me;
-	sockaddr_in si_other;
-	int aSocket;
-	char buf[BUFLEN];
-
-	LOG(ALERT) << argv[0] << " (re)starting";
-	srand ( time(NULL) + (int)getpid() );
-	my_udp_port = gConfig.getNum("SubscriberRegistry.Port");
-	gSubscriberRegistry.init();
-	gNodeManager.setAppLogicHandler(&nmHandler);
-	gNodeManager.start(45064);
-
-	// init osip lib
-	osip_t *osip;
-	int i=osip_init(&osip);
-	if (i!=0) {
-		LOG(ALERT) << "cannot init sip lib";
-		exit(1);
-	}
-
-	if ((aSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-		LOG(ALERT) << "can't initialize socket";
-		exit(1);
-	}
-
-	memset((char *) &si_me, 0, sizeof(si_me));
-	si_me.sin_family = AF_INET;
-	si_me.sin_port = htons(my_udp_port);
-	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
-	if (bind(aSocket, (sockaddr*)&si_me, sizeof(si_me)) == -1) {
-		LOG(ALERT) << "can't bind socket on port " << my_udp_port;
-		exit(1);
-	}
-
-	LOG(NOTICE) << "binding on port " << my_udp_port;
-
-	while (true) {
-		gConfig.purge();
-		socklen_t slen = sizeof(si_other);
-		memset(buf, 0, BUFLEN);
-		if (recvfrom(aSocket, buf, BUFLEN, 0, (sockaddr*)&si_other, &slen) == -1) {
-			LOG(ERR) << "recvfrom problem";
-			continue;
-		}
-
-		LOG(INFO) << " receiving " << buf;
-
-		char *dest = processBuffer(buf);
-		if (dest == NULL) {
-			continue;
-		}
-
-		if (sendto(aSocket, dest, strlen(dest), 0, (sockaddr*)&si_other, sizeof(si_other)) == -1) {
-			LOG(ERR) << "sendto problem";
-			continue;
-		}
-		osip_free(dest);
-	}
-
-	close(aSocket);
-	return 0;
-}
+//int
+//main(int argc, char **argv)
+//{
+//	// TODO: Properly parse and handle any arguments
+//	if (argc > 1) {
+//		for (int argi = 0; argi < argc; argi++) {
+//			if (!strcmp(argv[argi], "--version") ||
+//			    !strcmp(argv[argi], "-v")) {
+//				cout << gVersionString << endl;
+//			}
+//			if (!strcmp(argv[argi], "--gensql")) {
+//				cout << gConfig.getDefaultSQL(string(argv[0]), gVersionString) << endl;
+//			}
+//			if (!strcmp(argv[argi], "--gentex")) {
+//				cout << gConfig.getTeX(string(argv[0]), gVersionString) << endl;
+//			}
+//		}
+//
+//		return 0;
+//	}
+//
+//	sockaddr_in si_me;
+//	sockaddr_in si_other;
+//	int aSocket;
+//	char buf[BUFLEN];
+//
+//	LOG(ALERT) << argv[0] << " (re)starting";
+//	srand ( time(NULL) + (int)getpid() );
+//	my_udp_port = gConfig.getNum("SubscriberRegistry.Port");
+//	gSubscriberRegistry.init();
+//	gNodeManager.setAppLogicHandler(&nmHandler);
+//	gNodeManager.start(45064);
+//
+//	// init osip lib
+//	osip_t *osip;
+//	int i=osip_init(&osip);
+//	if (i!=0) {
+//		LOG(ALERT) << "cannot init sip lib";
+//		exit(1);
+//	}
+//
+//	if ((aSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+//		LOG(ALERT) << "can't initialize socket";
+//		exit(1);
+//	}
+//
+//	memset((char *) &si_me, 0, sizeof(si_me));
+//	si_me.sin_family = AF_INET;
+//	si_me.sin_port = htons(my_udp_port);
+//	si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+//	if (bind(aSocket, (sockaddr*)&si_me, sizeof(si_me)) == -1) {
+//		LOG(ALERT) << "can't bind socket on port " << my_udp_port;
+//		exit(1);
+//	}
+//
+//	LOG(NOTICE) << "binding on port " << my_udp_port;
+//
+//	while (true) {
+//		gConfig.purge();
+//		socklen_t slen = sizeof(si_other);
+//		memset(buf, 0, BUFLEN);
+//		if (recvfrom(aSocket, buf, BUFLEN, 0, (sockaddr*)&si_other, &slen) == -1) {
+//			LOG(ERR) << "recvfrom problem";
+//			continue;
+//		}
+//
+//		LOG(INFO) << " receiving " << buf;
+//
+//		char *dest = processBuffer(buf);
+//		if (dest == NULL) {
+//			continue;
+//		}
+//
+//		if (sendto(aSocket, dest, strlen(dest), 0, (sockaddr*)&si_other, sizeof(si_other)) == -1) {
+//			LOG(ERR) << "sendto problem";
+//			continue;
+//		}
+//		osip_free(dest);
+//	}
+//
+//	close(aSocket);
+//	return 0;
+//}

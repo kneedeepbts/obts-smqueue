@@ -26,7 +26,7 @@
 
 
 
-#include <config.h>
+//#include <config.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <cstdio>

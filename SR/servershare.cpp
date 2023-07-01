@@ -47,46 +47,46 @@ extern SubscriberRegistry gSubscriberRegistry;
 
 
 
-ConfigurationKeyMap getConfigurationKeys()
-{
-	ConfigurationKeyMap map;
-	ConfigurationKey *tmp;
-
-	tmp = new ConfigurationKey("SubscriberRegistry.A3A8","/OpenBTS/comp128",
-		"",
-		ConfigurationKey::CUSTOMERWARN,
-		ConfigurationKey::FILEPATH,
-		"",
-		false,
-		"Path to the program that implements the A3/A8 algorithm."
-	);
-	map[tmp->getName()] = *tmp;
-	delete tmp;
-
-	tmp = new ConfigurationKey("SubscriberRegistry.db","/var/lib/asterisk/sqlite3dir/sqlite3.db",
-		"",
-		ConfigurationKey::CUSTOMERWARN,
-		ConfigurationKey::FILEPATH,
-		"",
-		false,
-		"The location of the sqlite3 database holding the subscriber registry."
-	);
-	map[tmp->getName()] = *tmp;
-	delete tmp;
-
-	tmp = new ConfigurationKey("SubscriberRegistry.Port","5064",
-		"",
-		ConfigurationKey::CUSTOMERWARN,
-		ConfigurationKey::PORT,
-		"",
-		false,
-		"Port used by the SIP Authentication Server."
-	);
-	map[tmp->getName()] = *tmp;
-	delete tmp;
-
-	return map;
-}
+//ConfigurationKeyMap getConfigurationKeys()
+//{
+//	ConfigurationKeyMap map;
+//	ConfigurationKey *tmp;
+//
+//	tmp = new ConfigurationKey("SubscriberRegistry.A3A8","/OpenBTS/comp128",
+//		"",
+//		ConfigurationKey::CUSTOMERWARN,
+//		ConfigurationKey::FILEPATH,
+//		"",
+//		false,
+//		"Path to the program that implements the A3/A8 algorithm."
+//	);
+//	map[tmp->getName()] = *tmp;
+//	delete tmp;
+//
+//	tmp = new ConfigurationKey("SubscriberRegistry.db","/var/lib/asterisk/sqlite3dir/sqlite3.db",
+//		"",
+//		ConfigurationKey::CUSTOMERWARN,
+//		ConfigurationKey::FILEPATH,
+//		"",
+//		false,
+//		"The location of the sqlite3 database holding the subscriber registry."
+//	);
+//	map[tmp->getName()] = *tmp;
+//	delete tmp;
+//
+//	tmp = new ConfigurationKey("SubscriberRegistry.Port","5064",
+//		"",
+//		ConfigurationKey::CUSTOMERWARN,
+//		ConfigurationKey::PORT,
+//		"",
+//		false,
+//		"Port used by the SIP Authentication Server."
+//	);
+//	map[tmp->getName()] = *tmp;
+//	delete tmp;
+//
+//	return map;
+//}
 
 string soGenerateIt()
 {

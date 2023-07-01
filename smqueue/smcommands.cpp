@@ -286,10 +286,10 @@ shortcode_register (const char *imsi, const char *msgtext,
 		case '+':
 			if (!seendig && !seenplus) {
 				*q++ = *p;
-				seenplus++;
+				seenplus = true;
 			} else {
 				answer << "Error: + can only be the first character in a phone number";
-				badnum++;
+				badnum = true;
 			}
 			break;
 		case ' ': case '(': case ')': case '\r': case '\n':
@@ -299,7 +299,7 @@ shortcode_register (const char *imsi, const char *msgtext,
 			break;
 		default:
 			answer << "Error: invalid character '" << *p << "' in requested number";
-			badnum++;
+			badnum = true;
 			break;
 		}
 	}
@@ -312,7 +312,7 @@ shortcode_register (const char *imsi, const char *msgtext,
 			answer << phonenum << " not valid with " << seendig << " digits. "
 				<< "Must be " << gConfig.getStr("SC.Register.Digits.Min").c_str()
 				<< " to " << gConfig.getStr("SC.Register.Digits.Max").c_str() << " digits.";
-			badnum++;
+			badnum = true;
 		}
 	}
    }

@@ -48,9 +48,9 @@
 // If timestr decl is changed G++ will whine when Utils.h is included.
 namespace Utils { const std::string timestr(); };
 
-#if !defined(gettid)
-# define gettid() syscall(SYS_gettid)
-#endif // !defined(gettid)
+//#if !defined(gettid)
+//# define gettid() syscall(SYS_gettid)
+//#endif // !defined(gettid)
 
 extern pid_t gPid;
 #define _LOG(level) \
