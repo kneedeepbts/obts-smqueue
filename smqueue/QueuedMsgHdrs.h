@@ -25,181 +25,183 @@
 #ifndef HEADERFORMSGS_H_
 #define HEADERFORMSGS_H_
 
+#include "shortmsgpending.h"
 
 class QueuedMsgHdrs {
 public:
 
-	enum MessageType {
-		TestMessage = 1,
-		SIPAckMsg = 2,
-		SendResponse = 3,
-		ProcessIncommingMsg = 4
-	};
+    enum MessageType {
+        TestMessage = 1,
+        SIPAckMsg = 2,
+        SendResponse = 3,
+        ProcessIncommingMsg = 4
+    };
 
-	QueuedMsgHdrs() {}
+    QueuedMsgHdrs() {}
 
-	QueuedMsgHdrs(enum MessageType eMessageType, void * ptr, int MessageSize) {
-		this->msgType = eMessageType;
-		pData = ptr;
-		smp = 0;
-		setMessageSize(sizeof(QueuedMsgHdrs));
-	}
+    QueuedMsgHdrs(enum MessageType eMessageType, void * ptr, int MessageSize) {
+        this->msgType = eMessageType;
+        pData = ptr;
+        smp = 0;
+        setMessageSize(sizeof(QueuedMsgHdrs));
+    }
 
-	virtual ~QueuedMsgHdrs() {
-		//LOG(DEBUG) << "QueuedMsgHdrs DTOR";
-	}
+    virtual ~QueuedMsgHdrs() {
+        //LOG(DEBUG) << "QueuedMsgHdrs DTOR";
+    }
 
-	void setpData(void * data);
-	void * getpData();
-	void setMsgType(enum MessageType msgType);
-	MessageType getMsgType() const;
-	SMqueue::short_msg_pending* getSmp() const;
-	void setSmp(SMqueue::short_msg_pending* smp);
-	int getMessageSize() { return messageSize; }
-	void setMessageSize(int iSize) { messageSize = iSize; }
-	virtual int ProcessMessage() {
-		// Not currently used
-		LOG(DEBUG) << "Process message QueuedMsgHdrs DID NOTHING";
-		return 0;
-	}
+    void setpData(void * data);
+    void * getpData();
+    void setMsgType(enum MessageType msgType);
+    MessageType getMsgType() const;
+    kneedeepbts::smqueue::ShortMsgPending* getSmp() const;
+    void setSmp(kneedeepbts::smqueue::ShortMsgPending* smp);
+    int getMessageSize() { return messageSize; }
+    void setMessageSize(int iSize) { messageSize = iSize; }
+    virtual int ProcessMessage() {
+        // Not currently used
+        LOG(DEBUG) << "Process message QueuedMsgHdrs DID NOTHING";
+        return 0;
+    }
 
 private:
-	MessageType msgType;
-	SMqueue::short_msg_pending *smp;  // the message in the queue
-	void * pData;
-	int messageSize;
+    MessageType msgType;
+    kneedeepbts::smqueue::ShortMsgPending *smp;  // the message in the queue
+    void * pData;
+    int messageSize;
 };
 
 
 class SIPAckMessage : public QueuedMsgHdrs {
 public:
 
-	SIPAckMessage(int err, SMqueue::short_msg_pending * smp, char * netaddr, size_t netaddrlen) {
-		setMsgType(QueuedMsgHdrs::SIPAckMsg);
-		setSmp(smp);       // Use the pointer later
-		setpData(0);
+    SIPAckMessage(int err, kneedeepbts::smqueue::ShortMsgPending * smp, char * netaddr, size_t netaddrlen) {
+        setMsgType(QueuedMsgHdrs::SIPAckMsg);
+        setSmp(smp);       // Use the pointer later
+        setpData(0);
 
-		this->errcode = err;
-		this->netaddr = netaddr;
-		this->netaddrlen = netaddrlen;
-		setMessageSize(sizeof(SIPAckMessage));
-	}
+        this->errcode = err;
+        this->netaddr = netaddr;
+        this->netaddrlen = netaddrlen;
+        setMessageSize(sizeof(SIPAckMessage));
+    }
 
-	virtual ~SIPAckMessage() {
-		// QueuedMsgHdrs dtor will delete smp
-		//LOG(DEBUG) << "SIPAckMessage DTOR";
-	}
+    virtual ~SIPAckMessage() {
+        // QueuedMsgHdrs dtor will delete smp
+        //LOG(DEBUG) << "SIPAckMessage DTOR";
+    }
 
-	int getErrcode() const
-	{
-		return errcode;
-	}
+    int getErrcode() const
+    {
+        return errcode;
+    }
 
-	void setErrcode(int errcode)
-	{
-		this->errcode = errcode;
-	}
+    void setErrcode(int errcode)
+    {
+        this->errcode = errcode;
+    }
 
-	char* getNetaddr() const
-	{
-		return netaddr;
-	}
+    char* getNetaddr() const
+    {
+        return netaddr;
+    }
 
-	void setNetaddr(char* netaddr)
-	{
-		this->netaddr = netaddr;
-	}
+    void setNetaddr(char* netaddr)
+    {
+        this->netaddr = netaddr;
+    }
 
-	size_t getNetaddrlen() const
-	{
-		return netaddrlen;
-	}
+    size_t getNetaddrlen() const
+    {
+        return netaddrlen;
+    }
 
-	void setNetaddrlen(size_t netaddrlen)
-	{
-		this->netaddrlen = netaddrlen;
-	}
+    void setNetaddrlen(size_t netaddrlen)
+    {
+        this->netaddrlen = netaddrlen;
+    }
 
-	virtual int ProcessMessage() {
-		LOG(DEBUG) << "Process message SIPAckMessage";
-		smq.respond_sip_ack(this->getErrcode(), (SMqueue::short_msg_pending *) this->getSmp(), // Real call to respond_sip_ack on writer thread
-					(char *) this->getNetaddr(), (int) this->getNetaddrlen());
-		return 0;
-	}
+    // FIXME: Why in the f*** would the message process itself?
+    virtual int ProcessMessage() {
+        LOG(DEBUG) << "Process message SIPAckMessage";
+        // Real call to respond_sip_ack on writer thread
+        // FIXME: smq.respond_sip_ack(this->getErrcode(), (kneedeepbts::smqueue::ShortMsgPending *) this->getSmp(), (char *) this->getNetaddr(), (int) this->getNetaddrlen());
+        return 0;
+    }
 
 private:
-	int errcode;
-	char* netaddr;
-	size_t netaddrlen;
+    int errcode;
+    char* netaddr;
+    size_t netaddrlen;
 };
 
 
 class TestMessage : public QueuedMsgHdrs {
 public:
 
-	TestMessage(std::string sMsg) {
-		strcpy(msg, sMsg.c_str());
+    TestMessage(std::string sMsg) {
+        strcpy(msg, sMsg.c_str());
 
-		setMsgType(QueuedMsgHdrs::TestMessage);
-		setSmp(0);
-		setpData(0);
-		setMessageSize(sizeof(TestMessage));
-	}
-	virtual ~TestMessage() {
-		//LOG(DEBUG) << "TestMessage DTOR";
-	}
+        setMsgType(QueuedMsgHdrs::TestMessage);
+        setSmp(0);
+        setpData(0);
+        setMessageSize(sizeof(TestMessage));
+    }
+    virtual ~TestMessage() {
+        //LOG(DEBUG) << "TestMessage DTOR";
+    }
 
-	virtual int ProcessMessage() {
-		LOG(DEBUG) << "Process message TestMessage msg:" << msg;  // Log is all this message has to do currently
-		return 0;
-	}//
+    virtual int ProcessMessage() {
+        LOG(DEBUG) << "Process message TestMessage msg:" << msg;  // Log is all this message has to do currently
+        return 0;
+    }//
 
 private:
-	char msg[50];
+    char msg[50];
 };
 
 
 class ProcessIncommingMsg : public QueuedMsgHdrs {
 public:
-	// Message will be sent to the writer thread so that msgs will be processed
-	ProcessIncommingMsg() {
-		setMsgType(QueuedMsgHdrs::ProcessIncommingMsg);
-		setSmp(0);
-		setpData(0);
-		setMessageSize(sizeof(ProcessIncommingMsg));
-	}
+    // Message will be sent to the writer thread so that msgs will be processed
+    ProcessIncommingMsg() {
+        setMsgType(QueuedMsgHdrs::ProcessIncommingMsg);
+        setSmp(0);
+        setpData(0);
+        setMessageSize(sizeof(ProcessIncommingMsg));
+    }
 
-	virtual ~ProcessIncommingMsg() {
-		//LOG(DEBUG) << "ProcessIncommingMsg DTOR";
+    virtual ~ProcessIncommingMsg() {
+        //LOG(DEBUG) << "ProcessIncommingMsg DTOR";
 
-	}
+    }
 
-	virtual int ProcessMessage() {
-		// Got a message in the queue go handle it
-		LOG(DEBUG) << "Process message ProcessIncommingMsg";
-		smq.process_timeout();
-		return 0;
-	}
+    virtual int ProcessMessage() {
+        // Got a message in the queue go handle it
+        LOG(DEBUG) << "Process message ProcessIncommingMsg";
+        // FIXME: smq.process_timeout();
+        return 0;
+    }
 
 };
 
 
 class SimpleWrapper {
 public:
-	SimpleWrapper(QueuedMsgHdrs* pData) {
-		msgPtr = pData;
-	}
+    SimpleWrapper(QueuedMsgHdrs* pData) {
+        msgPtr = pData;
+    }
 
-	~SimpleWrapper() {
-		// don't delete msgPtr this will be doe by receiving client
-		//LOG(DEBUG) << "SimpleWrapper DTOR";
-	}
-	int getSize() { return sizeof(SimpleWrapper); }
-	QueuedMsgHdrs* getMsgPtr() { return msgPtr; }
-	void setMsgPtr(QueuedMsgHdrs* pData) { msgPtr = pData; }
+    ~SimpleWrapper() {
+        // don't delete msgPtr this will be doe by receiving client
+        //LOG(DEBUG) << "SimpleWrapper DTOR";
+    }
+    int getSize() { return sizeof(SimpleWrapper); }
+    QueuedMsgHdrs* getMsgPtr() { return msgPtr; }
+    void setMsgPtr(QueuedMsgHdrs* pData) { msgPtr = pData; }
 
 private:
-	QueuedMsgHdrs* msgPtr;
+    QueuedMsgHdrs* msgPtr;
 }; // SimpleWrapper
 
 

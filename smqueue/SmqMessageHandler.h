@@ -38,7 +38,10 @@ extern ConfigurationTable gConfig;
 #include "SmqGlobals.h"
 #include <unistd.h>
 
-void queue_respond_sip_ack(int errcode, SMqueue::short_msg_pending *shortmsg, char * netaddr, size_t netaddrlen);
+#include "shortmsgpending.h"
+#include "QueuedMsgHdrs.h"
+
+void queue_respond_sip_ack(int errcode, kneedeepbts::smqueue::ShortMsgPending *shortmsg, char * netaddr, size_t netaddrlen);
 void ProcessReceivedMsg();
 void SendTestMessage();
 

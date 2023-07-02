@@ -32,9 +32,11 @@
 #include <unistd.h>
 #include <Logger.h>
 
+#include "shortmsgpending.h"
+
 namespace SMqueue {
 
-class short_msg_pending;		// Forward declaration
+//class short_msg_pending;		// Forward declaration
 
 class SMnet {
 	public:
@@ -231,8 +233,7 @@ class SMnet {
 	 * Result is false if failed; true if we think we sent it.
 	 * (Note that an ack should come back eventually -- we don't await it.)
 	 */
-	bool
-	deliver_msg_datagram(short_msg_pending *);
+	bool deliver_msg_datagram(kneedeepbts::smqueue::ShortMsgPending *);
 
 	/*
  	 * The global name of this host (facing the network).

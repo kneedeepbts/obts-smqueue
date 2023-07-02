@@ -95,9 +95,7 @@ SMnet::send_dgram(char *buffer, size_t buffsize, char *toaddr,
  * good return true
  * bad return false
  * */
-bool
-SMnet::deliver_msg_datagram(SMqueue::short_msg_pending *smp)
-{
+bool SMnet::deliver_msg_datagram(kneedeepbts::smqueue::ShortMsgPending * smp) {
 	char *scheme, *host, *port;
 	int s, i;
 	// Make sure the text is valid before writing it for debug,

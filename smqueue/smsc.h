@@ -23,7 +23,9 @@
 #ifndef SMSC_H
 #define SMSC_H
 
-#include "smqueue.h"
+//#include "smqueue.h"
+#include "shortcodeparams.h"
+#include "shortmsgpending.h"
 
 #undef WARNING
 
@@ -33,10 +35,10 @@ using namespace SMqueue;
   @param msgttext RPData encoded into hex-string.
   @return Pointer to parsed RPData or NULL on failure.
 */
-RPData *hex2rpdata(const char *msgtext);
+SMS::RPData *hex2rpdata(const char *msgtext);
 
-enum short_code_action shortcode_smsc(const char *imsi, const char *msgtext,
-                                      short_code_params *scp);
-bool pack_sms_for_delivery(short_msg_p_list::iterator &smsg);
+enum short_code_action shortcode_smsc(const char *imsi, const char *msgtext, kneedeepbts::smqueue::short_code_params *scp);
+
+bool pack_sms_for_delivery(kneedeepbts::smqueue::short_msg_p_list::iterator &smsg);
 
 #endif

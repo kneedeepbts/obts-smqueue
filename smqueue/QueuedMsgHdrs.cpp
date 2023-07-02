@@ -50,13 +50,13 @@ void QueuedMsgHdrs::setMsgType(MessageType msgType)
 }
 
 
-SMqueue::short_msg_pending* QueuedMsgHdrs::getSmp() const
+kneedeepbts::smqueue::ShortMsgPending * QueuedMsgHdrs::getSmp() const
 {
 	return smp;
 }
 
 
-void QueuedMsgHdrs::setSmp(SMqueue::short_msg_pending* smp)
+void QueuedMsgHdrs::setSmp(kneedeepbts::smqueue::ShortMsgPending * smp)
 {
 	this->smp = smp;
 }

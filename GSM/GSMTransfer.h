@@ -83,7 +83,7 @@ class L2Address {
 	/**@name Obvious accessors. */
 	//@{
 	unsigned SAPI() const { return mSAPI; }
-	unsigned CR() const { return mCR; }
+	unsigned CRm() const { return mCR; }
 	unsigned LPD() const { return mLPD; }
 	//@}
 
@@ -397,7 +397,7 @@ class L2Frame : public BitVector {
 	unsigned NS() const { return peekField(8*1+4,3); }
 
 	/** Return the CR bit, GSM 04.06 3.3.2.  Assumes A or B header. */
-	bool CR() const { return mStart[6] & 0x01; }
+	bool CRm() const { return mStart[6] & 0x01; }
 
 	/** Return truw if this a DCCH idle frame. */
 	bool DCCHIdle() const
