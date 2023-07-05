@@ -20,93 +20,85 @@
  *  Created on: Nov 16, 2013
  *      Author: Scott Van Gundy
  */
-
+#include "SmqWriter.h"
 
 #include <string>
-#include "smqueue.h"
-#include "QueuedMsgHdrs.h"
 
-#include "SmqMessageHandler.h"
-#include "SmqWriter.h"
 #include <Logger.h>
 
-extern SmqWriter* smqWriter;
+#include "QueuedMsgHdrs.h"
+#include "SmqMessageHandler.h"
 
+namespace kneedeepbts::smqueue {
+    std::string SmqWriter::MQ_NAME = "/SmqWriter";
 
-extern SMqueue::SMq smq;
+    SmqWriter::~SmqWriter() {
+        delete mqueHan;
+    }
 
-std::string SmqWriter::MQ_NAME = "/SmqWriter";
+    void *SmqWriter::SmqWriterThread(void *ptr) {
+        LOG(DEBUG) << "Start SMQ writer thread";
 
+        SmqWriter * smqw = (SmqWriter *) ptr;
 
+        char msgBuffer[MQ_MESSAGE_MAX_SIZE + 10];
+        int bytesRead = 0;
+        int msgCount = 0;
+        SimpleWrapper *pWrap;
+        QueuedMsgHdrs *pMsg;
+        unsigned long currentSeconds;
+        unsigned long lastRunSeconds;
+        ShortMsgPending pendingMsg;
 
-SmqWriter::~SmqWriter() {
-	delete mqueHan;
+        // Queue opened  Process messages
+        currentSeconds = getCurrentSeconds();
+        lastRunSeconds = currentSeconds;
+        LOG(DEBUG) << "Enter writer thread loop";
+        while (!smqw->smq_manager->stop_main_loop) {
+
+            //LOG(DEBUG) <<"Start SMQ writer thread loop";
+            bytesRead = smqw->getqueHan()->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
+            currentSeconds = getCurrentSeconds();
+            //LOG(DEBUG) << "Got return from SmqWaitforMessage in writer status:" << bytesRead;
+            if (bytesRead < 0) {
+                LOG(DEBUG) << "Writer failed to get message:" << bytesRead;
+
+            } else if (bytesRead == 0) {
+                // ******** Got timeout ***************
+                //LOG(DEBUG) << "Got timeout in writer thread";
+
+                smq_manager->process_timeout();  // Process entries in queue
+                //LOG(DEBUG) << "Return from process_timeout";
+
+                if ((currentSeconds - lastRunSeconds) > 60) {
+                    LOG(DEBUG) << "Run once a minute stuff";
+                    smq_manager->InitInsideReaderLoop(); // Updates configuration
+
+                    int queueSize = smqw->smq_manager->time_sorted_list.size();
+                    if (queueSize > 0) { LOG(DEBUG) << "Queue size " << queueSize; }
+                    // Save queue to file on timeout
+                    //LOG(DEBUG) << "Enter save_queue_to_file";
+                    if (!smq_manager->save_queue_to_file(
+                            smqw->smq_manager->savefile)) {  // Save queue file each timeout  may want to slow this down
+                        LOG(WARNING) << "Failed to read queue file on timeout file:" << smqw->smq_manager->savefile;
+                    }
+                    lastRunSeconds = currentSeconds;
+                }
+
+            } else if (bytesRead > 0) {
+                // ********* Got message *************
+                //LOG(DEBUG) << "Received message in writer thread length:" << bytesRead;
+                pWrap = (SimpleWrapper *) msgBuffer;
+                pMsg = pWrap->getMsgPtr();
+
+                // PROCESS MESSAGES HERE
+                pMsg->ProcessMessage();
+
+                delete pMsg;
+            } // Got message
+        } // while
+
+        LOG(DEBUG) << "End SMQ writer thread";
+        return NULL;
+    }
 }
-
-
-void* SmqWriter::SmqWriterThread(void * ptr) {
-	LOG(DEBUG) <<"Start SMQ writer thread";
-
-	char msgBuffer[MQ_MESSAGE_MAX_SIZE+10];
-	int bytesRead = 0;
-	int msgCount = 0;
-	SimpleWrapper* pWrap;
-	QueuedMsgHdrs* pMsg;
-	unsigned long currentSeconds;
-	unsigned long lastRunSeconds;
-	SMqueue::short_msg_pending pendingMsg;
-
-	// Queue opened  Process messages
-	currentSeconds = getCurrentSeconds();
-	lastRunSeconds = currentSeconds;
-	LOG(DEBUG) << "Enter writer thread loop";
-	while (!smq.stop_main_loop) {
-
-		//LOG(DEBUG) <<"Start SMQ writer thread loop";
-		bytesRead = smqWriter->getqueHan()->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
-		currentSeconds = getCurrentSeconds();
-		//LOG(DEBUG) << "Got return from SmqWaitforMessage in writer status:" << bytesRead;
-		if (bytesRead < 0) {
-			LOG(DEBUG) << "Writer failed to get message:" << bytesRead;
-
-		} else if (bytesRead == 0) {
-			// ******** Got timeout ***************
-			//LOG(DEBUG) << "Got timeout in writer thread";
-
-			smq.process_timeout();  // Process entries in queue
-			//LOG(DEBUG) << "Return from process_timeout";
-
-			if ((currentSeconds - lastRunSeconds ) > 60) {
-				LOG(DEBUG) << "Run once a minute stuff";
-				smq.InitInsideReaderLoop(); // Updates configuration
-
-				int queueSize = smq.time_sorted_list.size();
-				if (queueSize > 0) { LOG(DEBUG) << "Queue size " << queueSize;}
-				// Save queue to file on timeout
-				//LOG(DEBUG) << "Enter save_queue_to_file";
-				if (!smq.save_queue_to_file(smq.savefile)) {  // Save queue file each timeout  may want to slow this down
-					LOG(WARNING) << "Failed to read queue file on timeout file:" << smq.savefile;
-				}
-				lastRunSeconds = currentSeconds;
-			}
-
-		} else if (bytesRead > 0) {
-			// ********* Got message *************
-			//LOG(DEBUG) << "Received message in writer thread length:" << bytesRead;
-			pWrap = (SimpleWrapper*) msgBuffer;
-			pMsg = pWrap->getMsgPtr();
-
-			// PROCESS MESSAGES HERE
-			pMsg->ProcessMessage();
-
-			delete pMsg;
-		} // Got message
-	} // while
-
-	LOG(DEBUG) << "End SMQ writer thread";
-	return NULL;
-}
-
-
-
-

@@ -26,13 +26,13 @@
 
 void StartTestThreads();
 
-#if 0
-class SmqTest {
-public:
-	SmqTest();
-	virtual ~SmqTest();
-};
-#endif
+//#if 0
+//class SmqTest {
+//public:
+//	SmqTest();
+//	virtual ~SmqTest();
+//};
+//#endif
 
 
 #endif /* SMQTEST_H_ */

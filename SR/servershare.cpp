@@ -40,10 +40,10 @@
 using namespace std;
 
 
-extern ConfigurationTable gConfig;
+//extern ConfigurationTable gConfig;
 
 // just using this for the database access
-extern SubscriberRegistry gSubscriberRegistry;
+//extern SubscriberRegistry gSubscriberRegistry;
 
 
 
@@ -99,31 +99,31 @@ string soGenerateIt()
 }
 
 // generate a 128' random number
-string generateRand(string imsi)
-{
-	string ki = gSubscriberRegistry.imsiGet(imsi, "ki");
-	string ret;
-	if (ki.length() != 0) {
-		LOG(INFO) << "ki is known";
-		// generate and return rand (clear any cached rand or sres)
-		gSubscriberRegistry.imsiSet(imsi, "rand", "", "sres", "");
-		ret = soGenerateIt();
-	} else {
-		string wRand = gSubscriberRegistry.imsiGet(imsi, "rand");
-		if (wRand.length() != 0) {
-			LOG(INFO) << "ki is unknown, rand is cached";
-			// return cached rand
-			ret = wRand;
-		} else {
-			LOG(INFO) << "ki is unknown, rand is not cached";
-			// generate rand, cache rand, clear sres, and return rand
-			wRand = soGenerateIt();
-			gSubscriberRegistry.imsiSet(imsi, "rand", wRand, "sres", "");
-			ret = wRand;
-		}
-	}
-	return ret;
-}
+//string generateRand(string imsi)
+//{
+//	string ki = gSubscriberRegistry.imsiGet(imsi, "ki");
+//	string ret;
+//	if (ki.length() != 0) {
+//		LOG(INFO) << "ki is known";
+//		// generate and return rand (clear any cached rand or sres)
+//		gSubscriberRegistry.imsiSet(imsi, "rand", "", "sres", "");
+//		ret = soGenerateIt();
+//	} else {
+//		string wRand = gSubscriberRegistry.imsiGet(imsi, "rand");
+//		if (wRand.length() != 0) {
+//			LOG(INFO) << "ki is unknown, rand is cached";
+//			// return cached rand
+//			ret = wRand;
+//		} else {
+//			LOG(INFO) << "ki is unknown, rand is not cached";
+//			// generate rand, cache rand, clear sres, and return rand
+//			wRand = soGenerateIt();
+//			gSubscriberRegistry.imsiSet(imsi, "rand", wRand, "sres", "");
+//			ret = wRand;
+//		}
+//	}
+//	return ret;
+//}
 
 bool strEqual(string a, string b)
 {
@@ -171,69 +171,69 @@ bool randEqual(string a, string b)
 	return (rand1h == rand2h) && (rand1l == rand2l);
 }
 
-// verify sres given rand and imsi's ki
-// may set kc
-// may cache sres and rand
-bool authenticate(string imsi, string randx, string sres, string *kc)
-{
-	string ki = gSubscriberRegistry.imsiGet(imsi, "ki");
-	bool ret;
-	if (ki.length() == 0) {
-		// Ki is unknown
-		string sres2 = gSubscriberRegistry.imsiGet(imsi, "sres");
-		if (sres2.length() == 0) {
-			LOG(INFO) << "ki unknown, no upstream server, sres not cached";
-			// first time - cache sres and rand so next time
-			// correct cell phone will calc same sres from same rand
-			gSubscriberRegistry.imsiSet(imsi, "sres", sres, "rand", randx);
-			ret = true;
-		} else {
-			LOG(INFO) << "ki unknown, no upstream server, sres cached";
-			// check against cached values of rand and sres
-			string rand2 = gSubscriberRegistry.imsiGet(imsi, "rand");
-			// TODO - on success, compute and return kc
-			LOG(DEBUG) << "comparing " << sres << " to " << sres2 << " and " << randx << " to " << rand2;
-			ret = sresEqual(sres, sres2) && randEqual(randx, rand2);
-		}
-	} else {
-		LOG(INFO) << "ki known";
-		// Ki is known, so do normal authentication
-		ostringstream os;
-		// per user value from subscriber registry
-		string a3a8 = gSubscriberRegistry.imsiGet(imsi, "a3_a8");
-		if (a3a8.length() == 0) {
-			// config value is default
-			a3a8 = gConfig.getStr("SubscriberRegistry.A3A8");
-		}
-		os << a3a8 << " 0x" << ki << " 0x" << randx;
-		// must not put ki into the log
-		// LOG(INFO) << "running " << os.str();
-		FILE *f = popen(os.str().c_str(), "r");
-		if (f == NULL) {
-			LOG(CRIT) << "error: popen failed";
-			return false;
-		}
-		char sres2[26];
-		char *str = fgets(sres2, 26, f);
-		if (str != NULL && strlen(str) == 25) str[24] = 0;
-		if (str == NULL || strlen(str) != 24) {
-			LOG(CRIT) << "error: popen result failed";
-			return false;
-		}
-		int st = pclose(f);
-		if (st == -1) {
-			LOG(CRIT) << "error: pclose failed";
-			return false;
-		}
-		// first 8 chars are SRES;  rest are Kc
-		*kc = sres2+8;
-		sres2[8] = 0;
-		LOG(INFO) << "result = " << sres2;
-		ret = sresEqual(sres, sres2);
-	}
-	LOG(INFO) << "returning = " << ret;
-	return ret;
-}
+//// verify sres given rand and imsi's ki
+//// may set kc
+//// may cache sres and rand
+//bool authenticate(string imsi, string randx, string sres, string *kc)
+//{
+//	string ki = gSubscriberRegistry.imsiGet(imsi, "ki");
+//	bool ret;
+//	if (ki.length() == 0) {
+//		// Ki is unknown
+//		string sres2 = gSubscriberRegistry.imsiGet(imsi, "sres");
+//		if (sres2.length() == 0) {
+//			LOG(INFO) << "ki unknown, no upstream server, sres not cached";
+//			// first time - cache sres and rand so next time
+//			// correct cell phone will calc same sres from same rand
+//			gSubscriberRegistry.imsiSet(imsi, "sres", sres, "rand", randx);
+//			ret = true;
+//		} else {
+//			LOG(INFO) << "ki unknown, no upstream server, sres cached";
+//			// check against cached values of rand and sres
+//			string rand2 = gSubscriberRegistry.imsiGet(imsi, "rand");
+//			// TODO - on success, compute and return kc
+//			LOG(DEBUG) << "comparing " << sres << " to " << sres2 << " and " << randx << " to " << rand2;
+//			ret = sresEqual(sres, sres2) && randEqual(randx, rand2);
+//		}
+//	} else {
+//		LOG(INFO) << "ki known";
+//		// Ki is known, so do normal authentication
+//		ostringstream os;
+//		// per user value from subscriber registry
+//		string a3a8 = gSubscriberRegistry.imsiGet(imsi, "a3_a8");
+//		if (a3a8.length() == 0) {
+//			// config value is default
+//			a3a8 = gConfig.getStr("SubscriberRegistry.A3A8");
+//		}
+//		os << a3a8 << " 0x" << ki << " 0x" << randx;
+//		// must not put ki into the log
+//		// LOG(INFO) << "running " << os.str();
+//		FILE *f = popen(os.str().c_str(), "r");
+//		if (f == NULL) {
+//			LOG(CRIT) << "error: popen failed";
+//			return false;
+//		}
+//		char sres2[26];
+//		char *str = fgets(sres2, 26, f);
+//		if (str != NULL && strlen(str) == 25) str[24] = 0;
+//		if (str == NULL || strlen(str) != 24) {
+//			LOG(CRIT) << "error: popen result failed";
+//			return false;
+//		}
+//		int st = pclose(f);
+//		if (st == -1) {
+//			LOG(CRIT) << "error: pclose failed";
+//			return false;
+//		}
+//		// first 8 chars are SRES;  rest are Kc
+//		*kc = sres2+8;
+//		sres2[8] = 0;
+//		LOG(INFO) << "result = " << sres2;
+//		ret = sresEqual(sres, sres2);
+//	}
+//	LOG(INFO) << "returning = " << ret;
+//	return ret;
+//}
 
 string join(string separator, vector<string> &strings)
 {

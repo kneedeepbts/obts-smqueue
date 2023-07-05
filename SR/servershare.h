@@ -38,7 +38,7 @@ ConfigurationKeyMap getConfigurationKeys();
 	Generate a 128-bit random number.
 	@param imsi imsi of subscriber the random number is for
 */
-string generateRand(string imsi);
+//string generateRand(string imsi);
 
 /**
 	Authenticate
@@ -46,7 +46,7 @@ string generateRand(string imsi);
 	@param rand random number
 	@param sres corresponsing sres
 */
-bool authenticate(string imsi, string rand, string sres, string *kc);
+//bool authenticate(string imsi, string rand, string sres, string *kc);
 
 /**
 	Join the strings in strings, separated by separator

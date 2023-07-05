@@ -111,7 +111,7 @@ char *new_strdup(const char *orig);
 
 /* Set this once we've called the initializer for the OSIP parser library. */
 //extern bool osip_initialized;
-extern struct osip *osipptr;
+//extern struct osip *osipptr;
 
 
 
@@ -121,7 +121,7 @@ extern struct osip *osipptr;
 //    /*static*/ int timeouts_NO_STATE[STATE_MAX_PLUS_ONE];
 
 /* Index to all timeouts */
-extern /*static*/ int (*timeouts[kneedeepbts::smqueue::STATE_MAX_PLUS_ONE])[kneedeepbts::smqueue::STATE_MAX_PLUS_ONE];
+//extern /*static*/ int (*timeouts[kneedeepbts::smqueue::STATE_MAX_PLUS_ONE])[kneedeepbts::smqueue::STATE_MAX_PLUS_ONE];
 
 //class SMq;
 
@@ -189,7 +189,7 @@ extern /*static*/ int (*timeouts[kneedeepbts::smqueue::STATE_MAX_PLUS_ONE])[knee
 //typedef std::map<std::string,short_func_t> short_code_map_t;  // Maps description (phone number) to function to call
 
 /* What fills in that map */
-void init_smcommands(kneedeepbts::smqueue::short_code_map_t *scm);
+//void init_smcommands(kneedeepbts::smqueue::short_code_map_t *scm);
 
 /* 
  * Main class for SIP Short Message processing.

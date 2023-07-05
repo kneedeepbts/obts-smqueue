@@ -3,8 +3,37 @@
 #include <fcntl.h>
 #include <iostream>
 #include <fstream>
+#include <utility>
+
+#include "spdlog/spdlog.h"
 
 namespace kneedeepbts::smqueue {
+    SmqManager::SmqManager(std::shared_ptr<cpptoml::table> config) {
+        m_config = config;
+        std::string savefile = m_config->get_as<std::string>("savefile");
+        m_writer = SmqWriter(savefile);
+        // FIXME: Should this be handled during this constructor, or as a preflight check in the main method, or in the "init before loop" methods?
+        // We need recursive attribute set
+        int mStatus = pthread_mutexattr_init(&mutexSLAttr);
+        if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_init error: {}", mStatus); }
+        pthread_mutexattr_settype(&mutexSLAttr, PTHREAD_MUTEX_RECURSIVE);
+        if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_settype error: {}", mStatus); }
+        pthread_mutex_init(&sortedListMutex, &mutexSLAttr);
+        if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutex_init error: {}", mStatus); }
+        // FIXME: Should this be handled in the "init before loop" methods?
+        my_hlr.init();
+    }
+
+    void SmqManager::run() {
+        // FIXME: Work to not have to provide "this" to the SmqReader and SmqWriter.
+        m_reader.run();
+        m_writer.run();
+    }
+
+
+
+
+
     void increase_acked_msg_timeout(ShortMsgPending *msg) {
         time_t timeout = SmqManager::INCREASEACKEDMSGTMOMS;
 
@@ -27,11 +56,11 @@ namespace kneedeepbts::smqueue {
     /*
     * We have received a SIP response message (with a status code like 200,
     * a message like "Okay", and various other fields).  Find the outgoing
-            * message that matches this response, and do the right thing.  The response
+    * message that matches this response, and do the right thing.  The response
     * message has already been parsed and validated.
     *
     * If the response says the message is delivered, delete both the response
-            * and the message.
+    * and the message.
     *
     * In general, delete the response so it won't stay at the front of the
     * queue.
@@ -669,36 +698,39 @@ namespace kneedeepbts::smqueue {
     void SmqManager::InitInsideReaderLoop() {
         // IP address:port of the Home Location Register that we send SIP
         // REGISTER messages to.
-        set_register_hostport(gConfig.getStr("Asterisk.address").c_str());
+        //set_register_hostport(gConfig.getStr("Asterisk.address").c_str());
 
         // IP address:port of the global relay where we sent SIP messages
         // if we don't know where else to send them.
-        string grIP = gConfig.getStr("SIP.GlobalRelay.IP");
-        string grPort = gConfig.getStr("SIP.GlobalRelay.Port");
-        string grContentType = gConfig.getStr("SIP.GlobalRelay.ContentType");
-        if (grIP.length() && grPort.length() && grContentType.length()) {
-            set_global_relay(grIP.c_str(), grPort.c_str(), grContentType.c_str());
+        //string grIP = gConfig.getStr("SIP.GlobalRelay.IP");
+        //string grPort = gConfig.getStr("SIP.GlobalRelay.Port");
+//        string grContentType = gConfig.getStr("SIP.GlobalRelay.ContentType");
+//        if (grIP.length() && grPort.length() && grContentType.length()) {
+//            set_global_relay(grIP.c_str(), grPort.c_str(), grContentType.c_str());
+//        } else {
+//            set_global_relay("", "", "");
+//        }
+        std::string content_type = *m_config->get_as<std::string>("globalrelay_type");
+        if (content_type == "text/plain") {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
+        } else if (content_type == "") {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
         } else {
-            set_global_relay("", "", "");
+            SPDLOG_ERROR("Bad Global Relay ContentType: {}", content_type);
+            // FIMXE: Error out here.
         }
-
-        // IP address of our own smqueue, as seen from outside.
-        set_my_ipaddress(gConfig.getStr("SIP.myIP" /* "127.0.0.1" */).c_str());
-        set_my_2nd_ipaddress(gConfig.getStr("SIP.myIP2" /* "NAT crap" */).c_str());
-
-        // Debug -- print all msgs in log
-        print_as_we_validate = gConfig.getBool("Debug.print_as_we_validate");
 
         // system() calls in back grounded jobs hang if stdin is still open on tty.
         // So, close it.
         close(0);     // Shut off stdin in case we're in background
         open("/dev/null", O_RDONLY);   // fill it with nullity
 
-        LOG(INFO) << "SIP.myPort UDP " << my_udp_port;
-        LOG(INFO) << "My own IP address is configured as " << my_ipaddress;
-        LOG(INFO) << "The HLR registry is at " << my_register_hostport;
+        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<std::string>("port"));
+        SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
+        SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
+        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<std::string>("registry_port"));
 
-        savefile = gConfig.getStr("savefile").c_str();
+        //savefile = gConfig.getStr("savefile").c_str();
 
         // Took out code that dumped queue file on each timeout svg
         // smq.debug_dump();

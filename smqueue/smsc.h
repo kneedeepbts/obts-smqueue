@@ -29,16 +29,17 @@
 
 #undef WARNING
 
-using namespace SMqueue;
+//using namespace SMqueue;
+namespace kneedeepbts::smqueue {
+    /** Unhex and parse msgtext to RPData struct.
+      @param msgttext RPData encoded into hex-string.
+      @return Pointer to parsed RPData or NULL on failure.
+    */
+    SMS::RPData *hex2rpdata(const char *msgtext);
 
-/** Unhex and parse msgtext to RPData struct.
-  @param msgttext RPData encoded into hex-string.
-  @return Pointer to parsed RPData or NULL on failure.
-*/
-SMS::RPData *hex2rpdata(const char *msgtext);
+    short_code_action shortcode_smsc(const char *imsi, const char *msgtext, short_code_params *scp);
 
-enum short_code_action shortcode_smsc(const char *imsi, const char *msgtext, kneedeepbts::smqueue::short_code_params *scp);
-
-bool pack_sms_for_delivery(kneedeepbts::smqueue::short_msg_p_list::iterator &smsg);
+    bool pack_sms_for_delivery(short_msg_p_list::iterator &smsg);
+}
 
 #endif

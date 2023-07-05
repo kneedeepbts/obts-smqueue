@@ -74,7 +74,6 @@ namespace kneedeepbts::smqueue {
         // (We get our own copy because
         // it's the only thing we need to
         // inherit from SMq.)
-        static const char *smp_my_2nd_ipaddress; // Idiocy for NAT
 
         /* Constructors */
         ShortMsgPending() :

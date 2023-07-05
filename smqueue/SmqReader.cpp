@@ -29,80 +29,82 @@
 
 #include <Logger.h>
 
-std::string SmqReader::MQ_NAME = "/SmqReader";
+namespace kneedeepbts::smqueue {
+    std::string SmqReader::MQ_NAME = "/SmqReader";
 
-extern SmqReader* smqReader;
+    SmqReader::~SmqReader() {
+        delete mqueHan;
+    }
 
+    void SmqReader::run() {
+        pthread_create(&mthread_ID, nullptr, SmqReaderThread, (void *) nullptr);
+    }
 
-SmqReader::~SmqReader() {
-	delete mqueHan;
-}
+    // FIXME: This whole structure is bass-ackwards.  The smq_manager should run the main loop, not the reader.
+    void *SmqReader::SmqReaderThread(void *ptr) {
+        LOG(DEBUG) << "Start SMQ reader thread";
 
+        char msgBuffer[MQ_MESSAGE_MAX_SIZE + 10];  // Must be larger than size speced in attr
+        int bytesRead = 0;
+        int msgCount = 0;
 
-void* SmqReader::SmqReaderThread(void* ptr) {
-	LOG(DEBUG) <<"Start SMQ reader thread";
+        smq_manager->InitBeforeMainLoop();
+        smq_manager->InitInsideReaderLoop(); // Updates configuration  do here to make sure everything is setup for threads
 
-	char msgBuffer[MQ_MESSAGE_MAX_SIZE+10];  // Must be larger than size speced in attr
-	int bytesRead = 0;
-	int msgCount = 0;
+        // Queue opened  Process messages
+        LOG(DEBUG) << "Enter reader thread loop";
+        while (!smq_manager->stop_main_loop) {
 
-	smq.InitBeforeMainLoop();
-	smq.InitInsideReaderLoop(); // Updates configuration  do here to make sure everything is setup for threads
-
-	// Queue opened  Process messages
-	LOG(DEBUG) << "Enter reader thread loop";
-	while (!smq.stop_main_loop) {
-
-		smq.main_loop(60000);
+            smq_manager->main_loop(60000);
 
 #if 0
-		// Put this back in if process messages in reader thread
-		LOG(DEBUG) <<"Start SMQ reader thread loop";
-		bytesRead = smqReader->getqueHan()->SmqWaitforMessage(2000, msgBuffer, sizeof(msgBuffer));  // Wait for message
+            // Put this back in if process messages in reader thread
+            LOG(DEBUG) <<"Start SMQ reader thread loop";
+            bytesRead = smqReader->getqueHan()->SmqWaitforMessage(2000, msgBuffer, sizeof(msgBuffer));  // Wait for message
 
-		//LOG(DEBUG) << "Got return from SmqWaitforMessage in reader thread status:%d", bytesRead);
-		if (bytesRead < 0) {
-			// GOT ERROR
-			LOG(DEBUG) << "Reader failed to get message:" << bytesRead;
+            //LOG(DEBUG) << "Got return from SmqWaitforMessage in reader thread status:%d", bytesRead);
+            if (bytesRead < 0) {
+                // GOT ERROR
+                LOG(DEBUG) << "Reader failed to get message:" << bytesRead;
 
-		} else if (bytesRead == 0) {
-			// TIMEOUT
-			LOG(DEBUG) << "Got timeout waiting for reader message";
-			//Add timeout stuff here
+            } else if (bytesRead == 0) {
+                // TIMEOUT
+                LOG(DEBUG) << "Got timeout waiting for reader message";
+                //Add timeout stuff here
 
-			//LOG(DEBUG) << "Enter InitInsideReaderLoop";
-			smq.InitInsideReaderLoop(); // Updates configuration  Moved this to writer queue
-			//LOG(DEBUG) << "Return from InitInsideReaderLoop";
+                //LOG(DEBUG) << "Enter InitInsideReaderLoop";
+                smq.InitInsideReaderLoop(); // Updates configuration  Moved this to writer queue
+                //LOG(DEBUG) << "Return from InitInsideReaderLoop";
 
-			// This is where all the work is done
-			// Message are read in here
-			//LOG(DEBUG) << "Enter main_loop";
-			smq.main_loop(2000);
-			//LOG(DEBUG) << "Return from main_loop";
+                // This is where all the work is done
+                // Message are read in here
+                //LOG(DEBUG) << "Enter main_loop";
+                smq.main_loop(2000);
+                //LOG(DEBUG) << "Return from main_loop";
 
-		} else if (bytesRead > 0) {
-			// GOT MESSAGE
-			LOG(DEBUG) << "Received message in reader thread length;" << bytesRead;
-			// PROCESS MESSAGES HERE
+            } else if (bytesRead > 0) {
+                // GOT MESSAGE
+                LOG(DEBUG) << "Received message in reader thread length;" << bytesRead;
+                // PROCESS MESSAGES HERE
 #if 0
-			switch (msgType) {
-			case QueuedMsgHdrs::TestMessage:
+                switch (msgType) {
+                case QueuedMsgHdrs::TestMessage:
 
-				break;
+                    break;
 
-			case QueuedMsgHdrs::SendResponse:   // this is a writer message
+                case QueuedMsgHdrs::SendResponse:   // this is a writer message
 
-				break;
-			} // switch
+                    break;
+                } // switch
 #endif
-		}
+            }
 #endif
-	} // while
+        } // while
 
-	smq.CleaupAfterMainreaderLoop();
+        smq_manager->CleaupAfterMainreaderLoop();
 
-	LOG(DEBUG) << "End SMQ reader thread";
-	return NULL;
+        LOG(DEBUG) << "End SMQ reader thread";
+        return NULL;
+    }
+
 }
-
-

@@ -1,9 +1,11 @@
 #ifndef OBTS_SMQUEUE_SMQMANAGER_H
 #define OBTS_SMQUEUE_SMQMANAGER_H
 
+#include <list>
 #include <string>
 
 #include <osipparser2/osip_message.h>
+#include <cpptoml.h>
 
 #include <Timeval.h>
 #include <NodeManager.h>
@@ -12,6 +14,9 @@
 #include "shortmsgpending.h"
 #include "smnet.h"
 #include "SmqMessageHandler.h"
+
+#include "SmqReader.h"
+#include "SmqWriter.h"
 
 /* Maximum text size of an SMS message.  */
 #define SMS_MESSAGE_MAX_LENGTH  160
@@ -23,172 +28,64 @@ namespace kneedeepbts::smqueue {
      */
     class SmqManager {
     public:
-
         // Put all timeouts in one place
         const static int TIMEOUTMS = 5000;
         const static int SMSRATELIMITMS = 1000;
         const static int LONGDELETMS = 5000000;   // 83 minutes  Used by SC.ZapQueued.Password
         const static int INCREASEACKEDMSGTMOMS = 60000;  // 5 minutes
 
+        explicit SmqManager(std::shared_ptr<cpptoml::table> config);
+
+        /* Destructor */
+        ~SmqManager() { pthread_mutex_destroy(&sortedListMutex); }
+
         void InitBeforeMainLoop();
         void CleaupAfterMainreaderLoop();
         void InitInsideReaderLoop();
 
-        /* A list of all messages we know about, sorted by time of next
-           action (assuming nothing arrives to change our mind before that
-           time). */
-        short_msg_p_list time_sorted_list;
+        void unlockSortedList() { pthread_mutex_unlock(&sortedListMutex); }
 
-        std::string savefile; //SMq
-        bool please_re_exec;
+        void lockSortedList() { pthread_mutex_lock(&sortedListMutex); }
 
-        pthread_mutexattr_t mutexSLAttr;
-        pthread_mutex_t sortedListMutex;
-
-        void unlockSortedList() {
-            // LOG(DEBUG) << "UNLOCK";  // debug opnly
-            pthread_mutex_unlock(&sortedListMutex);
-        }
-
-        void lockSortedList() {
-            // LOG(DEBUG) << "LOCK"; // debug only
-            pthread_mutex_lock(&sortedListMutex);
-        }
-
-        /* We may later want other accessors for faster access to various
-           messages when things DO arrive.  For now, linear search!  */
-
-        /* The network sockets that we're using for I/O */
-        SMqueue::SMnet my_network;
-
-        /* The interface to the Host Location Register for routing
-           messages and looking up their return and destination addresses.  */
-        SubscriberRegistry my_hlr;
-
-        /* Where to send SMS's that we can't route locally. */
-        std::string global_relay;
-        std::string global_relay_port;
-        kneedeepbts::smqueue::ShortMsg::ContentType global_relay_contenttype;
-
-        /* My IP address (I can't tell how I look to others). */
-        std::string my_ipaddress;
-        /* Idiocy for NAT */
-        std::string my_2nd_ipaddress;
-
-        /* My port number. */
-        std::string my_udp_port;
-
-        /* The IP addr:port of the HLR, where we send SIP REGISTER
-           messages to associate IMSIs with cell site addr:port numbers. */
-        std::string my_register_hostport;
-
-        /* The call-ID, CSeq, and flag we use in registration requests */
-        std::string register_call_id;
-        int register_call_seq;
-        bool have_register_call_id;
-
-        /* Set this to true when you want main loop to stop.  */
-        bool stop_main_loop;
-
-        /* Set this to true when you want the program to re-exec itself
-           instead of terminating after the main loop stops.  */
-        bool reexec_smqueue;
-
-        // Bringing here from smqueue "global"
-        bool print_as_we_validate = false;
-        bool osip_initialized = false;
-        struct osip *osipptr = NULL; // Ptr to struct sorta used by library
-        FILE * gCDRFile = NULL;
-        /** The remote node manager. */
-        NodeManager gNodeManager;
-        /** rate limiting timer */
-        Timeval spacingTimer;
-
-        // Input from command line
-        int argc;
-        char **argv;
-
-        /* Constructor */
-        SmqManager () :
-                time_sorted_list (),
-                my_network (),
-                my_hlr(),
-                global_relay(""),
-                my_ipaddress(""),
-                my_2nd_ipaddress(""),
-                my_udp_port(""),
-                my_register_hostport(""),
-                register_call_id(""),
-                register_call_seq(0),
-                have_register_call_id(false),
-                stop_main_loop (false),
-                reexec_smqueue (false)
-        {
-            // We need recursive attribute set
-            int mStatus;
-            mStatus = pthread_mutexattr_init(&mutexSLAttr);
-            if (mStatus != 0) { LOG(DEBUG) << "Mutex pthread_mutexattr_init error " << mStatus; }
-            pthread_mutexattr_settype(&mutexSLAttr, PTHREAD_MUTEX_RECURSIVE);
-            if (mStatus != 0) { LOG(DEBUG) << "Mutex pthread_mutexattr_settype error " << mStatus; }
-            pthread_mutex_init(&sortedListMutex, &mutexSLAttr);
-            if (mStatus != 0) { LOG(DEBUG) << "Mutex pthread_mutex_init error " << mStatus; }
-
-            my_hlr.init();
-        }
-
-
-        /* Destructor */
-        ~SmqManager() {
-            pthread_mutex_destroy(&sortedListMutex);
-        }
-
-
-        // Override operator= so -Weffc++ doesn't complain
-        // *DISABLE* assignments by making the = operation private.
-    private:
-        SmqManager & operator= (const SmqManager &rvalue);
-    public:
         void osip_mem_release();
 
-        /* Set my own IP address, since I can't tell how I look to others. */
-        void set_my_ipaddress(std::string myip) {
-            my_ipaddress = myip;
-            // Point to it for message validity checking.
-            // NOTE: that copy shares same storage as this one.
-            kneedeepbts::smqueue::ShortMsgPending::smp_my_ipaddress = myip.c_str();
-        }
+        // This is the method to initialliz and then run the main_loop
+        void run();
 
-        /* Set my 2nd IP address, since NAT is widespread among idiots. */
-        void set_my_2nd_ipaddress(std::string myip) {
-            my_2nd_ipaddress = myip;
-            // Point to it for message validity checking.
-            // NOTE: that copy shares same storage as this one.LOG(DEBUG) << "Run once a minute stuff"
-            kneedeepbts::smqueue::ShortMsgPending::smp_my_2nd_ipaddress = myip.c_str();
-        }
+//        /* Set my own IP address, since I can't tell how I look to others. */
+//        void set_my_ipaddress(std::string myip) {
+//            my_ipaddress = myip;
+//            // Point to it for message validity checking.
+//            // NOTE: that copy shares same storage as this one.
+//            // FIXME: What't this for? And do we need it going forward?
+//            kneedeepbts::smqueue::ShortMsgPending::smp_my_ipaddress = myip.c_str();
+//        }
 
-        /* Set the global relay address (host:port string) */
-        void set_global_relay(std::string gr, std::string port, std::string contentType) {
-            global_relay = gr;
-            global_relay_port = port;
-            if (contentType.length()) {
-                if (contentType == "text/plain") {
-                    global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
-                } else if (contentType == "application/vnd.3gpp.sms") {
-                    global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
-                }
-            } else {
-                global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
-            }
-        }
+//        /* Set the global relay address (host:port string) */
+//        void set_global_relay(std::string gr, std::string port, std::string contentType) {
+//            global_relay = gr;
+//            global_relay_port = port;
+//            if (contentType.length()) {
+//                if (contentType == "text/plain") {
+//                    global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
+//                } else if (contentType == "application/vnd.3gpp.sms") {
+//                    global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
+//                }
+//            } else {
+//                global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
+//            }
+//        }
 
-        /* Set the register host & port -- where to register handsets */
-        void set_register_hostport(std::string hp) {
-            my_register_hostport = hp;
-        }
+        // NOTE: Now get from the config.
+//        /* Set the register host & port -- where to register handsets */
+//        void set_register_hostport(std::string hp) {
+//            my_register_hostport = hp;
+//        }
 
+        // FIXME: This should be pulled out into a "tcp/udp server" class.
         /* Initialize the listener -- sets up and opens my_network. */
         bool init_listener (std::string port) {
-            my_udp_port = port;
+            //my_udp_port = port;
             return my_network.listen_on_port (port);
         }
 
@@ -331,7 +228,10 @@ namespace kneedeepbts::smqueue {
             time_sorted_list.begin()->set_state (s, t);
             unlockSortedList();
             debug_dump(); //svgfix
-            ProcessReceivedMsg();
+            //ProcessReceivedMsg();
+            QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
+            SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
+            SendWriterMsg(sWrap);
         }
 
         /* Debug dump of the queue and the SMq class in general. */
@@ -415,6 +315,61 @@ namespace kneedeepbts::smqueue {
            SIP response error code (e.g. 405).  */
         // FIXME: This causes a circular dependency between SmqManager and this class
         int validate_short_msg(ShortMsgPending *smp, bool should_early_check);
+    private:
+        // Override operator= so -Weffc++ doesn't complain
+        // *DISABLE* assignments by making the = operation private.
+        SmqManager & operator= (const SmqManager &rvalue);
+
+        std::shared_ptr<cpptoml::table> m_config;
+
+        /* A list of all messages we know about, sorted by time of next action (assuming nothing arrives to change our
+         * mind before that time). */
+        std::list<ShortMsgPending> time_sorted_list{};
+
+        //std::string savefile;
+        bool please_re_exec = false;
+
+        pthread_mutexattr_t mutexSLAttr{};
+        pthread_mutex_t sortedListMutex{};
+
+        /* The network sockets that we're using for I/O */
+        SMqueue::SMnet my_network{};
+
+        /* The interface to the Host Location Register for routing
+           messages and looking up their return and destination addresses.  */
+        SubscriberRegistry my_hlr{};
+
+        /* Where to send SMS's that we can't route locally. */
+        //std::string global_relay;
+        //std::string global_relay_port;
+        kneedeepbts::smqueue::ShortMsg::ContentType global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
+
+        /* The call-ID, CSeq, and flag we use in registration requests */
+        std::string register_call_id;
+        int register_call_seq = 0;
+        bool have_register_call_id = false; // FIXME: Trigger off "" value of call_id?
+
+        /* Set this to true when you want main loop to stop.  */
+        bool stop_main_loop = false;
+
+        /* Set this to true when you want the program to re-exec itself
+           instead of terminating after the main loop stops.  */
+        bool reexec_smqueue = false; // FIXME: Is this necessary?
+
+        // Bringing here from smqueue "global"
+        //bool print_as_we_validate = false;
+        bool osip_initialized = false;
+        struct osip *osipptr = nullptr; // Ptr to struct sorta used by library
+        FILE * gCDRFile = nullptr;
+
+        /** The remote node manager. */
+        NodeManager gNodeManager;
+
+        /** rate limiting timer */
+        Timeval spacingTimer;
+
+        SmqReader m_reader{};
+        SmqWriter m_writer;
     };
 }
 
