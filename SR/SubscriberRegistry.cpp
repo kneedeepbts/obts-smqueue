@@ -170,7 +170,8 @@ static const char* createMEMSBTable = {
 
 int SubscriberRegistry::init()
 {
-	string ldb = gConfig.getStr("SubscriberRegistry.db");
+	//string ldb = gConfig.getStr("SubscriberRegistry.db");
+    string ldb = "/etc/openbts/olddb.sqlite";
 	size_t p = ldb.find_last_of('/');
 	if (p == string::npos) {
 		LOG(EMERG) << "SubscriberRegistry.db not in a directory?";
@@ -184,7 +185,8 @@ int SubscriberRegistry::init()
 		mDB = NULL;
 		return 1;
 	}
-	mNumSQLTries=gConfig.getNum("Control.NumSQLTries"); 
+	//mNumSQLTries=gConfig.getNum("Control.NumSQLTries");
+    mNumSQLTries=1;
 	int rc = sqlite3_open(ldb.c_str(),&mDB);
 	if (rc) {
 		LOG(EMERG) << "Cannot open SubscriberRegistry database: " << ldb << " error: " << sqlite3_errmsg(mDB);
@@ -747,12 +749,12 @@ SubscriberRegistry::Status SubscriberRegistry::RRLPUpdate(string name, string la
 }
 
 #ifndef SR_API_ONLY
-extern SubscriberRegistry gSubscriberRegistry;
+//extern SubscriberRegistry gSubscriberRegistry;
 void* subscriberRegistrySyncer(void*)
 {
 	while (true) {
 		sleep(15);
-		gSubscriberRegistry.syncMemoryDB();
+		//gSubscriberRegistry.syncMemoryDB();
 	}
 
 	return NULL;

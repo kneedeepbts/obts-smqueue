@@ -47,126 +47,130 @@ namespace kneedeepbts::smqueue {
 
 
 /** Send SMS via and HTTP interface. */
-    short_code_action sendHTTP(const char *destination, const std::string &message) {
-        char convMessage[message.length() + 2];
-        convertText(convMessage, message.data());
-        char c1[1024];
-        sprintf(c1, "wget -t %d -T %d -q -O - \"%s\"",
-                (int) gConfig.getNum("SMS.HTTPGateway.Retries"),
-                (int) gConfig.getNum("SMS.HTTPGateway.Timeout"),
-                gConfig.getStr("SMS.HTTPGateway.URL").c_str());
-        char command[1500];
-        // FIXME -- Check specs for a good timeout value here.
-        sprintf(command, c1, destination, convMessage);
-        LOG(INFO) << "sending via HTTP:" << command;
-
-        // HTTP "GET" method with wget.
-        // FIXME -- Look at the output of wget to check success.
-        FILE *wget = popen(command, "r");
-        if (!wget) {
-            LOG(ALERT) << "cannot open wget with " << command;
-            return SCA_INTERNAL_ERROR;
-        }
-        pclose(wget);
-        return SCA_DONE;
-    }
+    // FIXME: Not sure what this is used for, so commenting out for now.
+//    short_code_action sendHTTP(const char *destination, const std::string &message) {
+//        char convMessage[message.length() + 2];
+//        convertText(convMessage, message.data());
+//        char c1[1024];
+//        sprintf(c1, "wget -t %d -T %d -q -O - \"%s\"",
+//                (int) gConfig.getNum("SMS.HTTPGateway.Retries"),
+//                (int) gConfig.getNum("SMS.HTTPGateway.Timeout"),
+//                gConfig.getStr("SMS.HTTPGateway.URL").c_str());
+//        char command[1500];
+//        // FIXME -- Check specs for a good timeout value here.
+//        sprintf(command, c1, destination, convMessage);
+//        LOG(INFO) << "sending via HTTP:" << command;
+//
+//        // HTTP "GET" method with wget.
+//        // FIXME -- Look at the output of wget to check success.
+//        FILE *wget = popen(command, "r");
+//        if (!wget) {
+//            LOG(ALERT) << "cannot open wget with " << command;
+//            return SCA_INTERNAL_ERROR;
+//        }
+//        pclose(wget);
+//        return SCA_DONE;
+//    }
 
 
 /** Send e-mail with local sendmail program. */
-    short_code_action sendEMail(const char *address, const char *body, const char *subject = NULL) {
+    // FIXME: Not sure what this is used for, so commenting out for now.
+//    short_code_action sendEMail(const char *address, const char *body, const char *subject = NULL) {
+//
+//        // FIXME -- This is broken under Ubuntu because the mail program is different from BSD's.
+//        LOG(WARNING) << "sending via SMTP is broken under Ubuntu, message body will likely be lost: " << address << ": "
+//                     << body;
+//
+//        // We're not checking for overflow because the TPDU can't be more than a few hundred bytes.
+//
+//        // Build the command line.
+//        // FIXME -- Use sendmail to have better header control.
+//        char command[1024];
+//        if (subject) sprintf(command, "mail -s \"%s\" %s", subject, address);
+//        else sprintf(command, "mail %s", address);
+//        LOG(INFO) << "sending via SMTP: \"" << body << "\" via \"" << command << "\"";
+//
+//        // Send the mail.
+//        FILE *mail = popen(command, "w");
+//        if (!mail) {
+//            LOG(ALERT) << "cannot send mail with \"" << command << "\"";
+//            return SCA_INTERNAL_ERROR;
+//        }
+//        // FIXME -- We should be sure body is 7-bit clean.
+//        // FIXME -- Ubuntu mail program automatically requests cc:.
+//        // That breaks portability.  How do we fix that?
+//        fprintf(mail, "%s", body);
+//        if (pclose(mail) == -1) return SCA_INTERNAL_ERROR;
+//        return SCA_DONE;
+//    }
 
-        // FIXME -- This is broken under Ubuntu because the mail program is different from BSD's.
-        LOG(WARNING) << "sending via SMTP is broken under Ubuntu, message body will likely be lost: " << address << ": "
-                     << body;
+    // FIXME: Not sure what this is used for, so commenting out for now.
+//    short_code_action sendSIP_init(const char *imsi, const SMS::TLSubmit &submit, const std::string &body, short_code_params *scp) {
+//        const char *address = submit.DA().digits();
+//        const SMS::TLUserData &tl_ud = submit.UD();
+//        const char *from = scp->scp_qmsg_it->parsed->from->url->username;
+//        LOG(INFO) << "from " << imsi << " to " << address;
+//
+//        if (scp == NULL) {
+//            LOG(WARNING) << "short_code_params is NULL. Error.";
+//            return SCA_INTERNAL_ERROR;
+//        }
+//
+//        // START OF THE SIP PROCESSING
+//        osip_message_t *omsg = scp->scp_qmsg_it->parsed;
+//
+//        // Req.URI
+//        osip_free(omsg->req_uri->username);
+//        omsg->req_uri->username = (char *) osip_malloc (strlen(address) + 1);
+//        strcpy(omsg->req_uri->username, address);
+//
+//        // To:
+//        set_to_for_smsc(address, scp->scp_qmsg_it);
+//
+//        // Let them know that parsed part has been changed.
+//        scp->scp_qmsg_it->parsed_was_changed();
+//
+//        /*if (ISLOGGING(DEBUG)) {
+//            // Call make_text_valid() is needed for debug only.
+//            scp->scp_qmsg_it->make_text_valid();
+//            LOG(DEBUG) << "Updated SMS message: " << scp->scp_qmsg_it->text;
+//        }*/
+//        return SCA_RESTART_PROCESSING;
+//    }
 
-        // We're not checking for overflow because the TPDU can't be more than a few hundred bytes.
-
-        // Build the command line.
-        // FIXME -- Use sendmail to have better header control.
-        char command[1024];
-        if (subject) sprintf(command, "mail -s \"%s\" %s", subject, address);
-        else sprintf(command, "mail %s", address);
-        LOG(INFO) << "sending via SMTP: \"" << body << "\" via \"" << command << "\"";
-
-        // Send the mail.
-        FILE *mail = popen(command, "w");
-        if (!mail) {
-            LOG(ALERT) << "cannot send mail with \"" << command << "\"";
-            return SCA_INTERNAL_ERROR;
-        }
-        // FIXME -- We should be sure body is 7-bit clean.
-        // FIXME -- Ubuntu mail program automatically requests cc:.
-        // That breaks portability.  How do we fix that?
-        fprintf(mail, "%s", body);
-        if (pclose(mail) == -1) return SCA_INTERNAL_ERROR;
-        return SCA_DONE;
-    }
-
-    short_code_action sendSIP_init(const char *imsi, const SMS::TLSubmit &submit, const std::string &body, short_code_params *scp) {
-        const char *address = submit.DA().digits();
-        const SMS::TLUserData &tl_ud = submit.UD();
-        const char *from = scp->scp_qmsg_it->parsed->from->url->username;
-        LOG(INFO) << "from " << imsi << " to " << address;
-
-        if (scp == NULL) {
-            LOG(WARNING) << "short_code_params is NULL. Error.";
-            return SCA_INTERNAL_ERROR;
-        }
-
-        // START OF THE SIP PROCESSING
-        osip_message_t *omsg = scp->scp_qmsg_it->parsed;
-
-        // Req.URI
-        osip_free(omsg->req_uri->username);
-        omsg->req_uri->username = (char *) osip_malloc (strlen(address) + 1);
-        strcpy(omsg->req_uri->username, address);
-
-        // To:
-        set_to_for_smsc(address, scp->scp_qmsg_it);
-
-        // Let them know that parsed part has been changed.
-        scp->scp_qmsg_it->parsed_was_changed();
-
-        /*if (ISLOGGING(DEBUG)) {
-            // Call make_text_valid() is needed for debug only.
-            scp->scp_qmsg_it->make_text_valid();
-            LOG(DEBUG) << "Updated SMS message: " << scp->scp_qmsg_it->text;
-        }*/
-        return SCA_RESTART_PROCESSING;
-    }
-
-    short_code_action sendSIP_init_text(const char *imsi,
-                                        const std::string &body, short_code_params *scp) {
-        const char *address = scp->scp_qmsg_it->parsed->to->url->username;
-        const char *from = scp->scp_qmsg_it->parsed->from->url->username;
-        LOG(INFO) << "from " << imsi << " to " << address;
-
-        if (scp == NULL) {
-            LOG(WARNING) << "short_code_params is NULL. Error.";
-            return SCA_INTERNAL_ERROR;
-        }
-
-        // START OF THE SIP PROCESSING
-        osip_message_t *omsg = scp->scp_qmsg_it->parsed;
-
-        // Req.URI
-        osip_free(omsg->req_uri->username);
-        omsg->req_uri->username = (char *) osip_malloc (strlen(address) + 1);
-        strcpy(omsg->req_uri->username, address);
-
-        // To:
-        set_to_for_smsc(address, scp->scp_qmsg_it);
-
-        // Let them know that parsed part has been changed.
-        scp->scp_qmsg_it->parsed_was_changed();
-
-        /*if (ISLOGGING(DEBUG)) {
-            // Call make_text_valid() is needed for debug only.
-            scp->scp_qmsg_it->make_text_valid();
-            LOG(DEBUG) << "Updated SMS message: " << scp->scp_qmsg_it->text;
-        }*/
-        return SCA_RESTART_PROCESSING;
-    }
+    // FIXME: Not sure what this is used for, so commenting out for now.
+//    short_code_action sendSIP_init_text(const char *imsi,
+//                                        const std::string &body, short_code_params *scp) {
+//        const char *address = scp->scp_qmsg_it->parsed->to->url->username;
+//        const char *from = scp->scp_qmsg_it->parsed->from->url->username;
+//        LOG(INFO) << "from " << imsi << " to " << address;
+//
+//        if (scp == NULL) {
+//            LOG(WARNING) << "short_code_params is NULL. Error.";
+//            return SCA_INTERNAL_ERROR;
+//        }
+//
+//        // START OF THE SIP PROCESSING
+//        osip_message_t *omsg = scp->scp_qmsg_it->parsed;
+//
+//        // Req.URI
+//        osip_free(omsg->req_uri->username);
+//        omsg->req_uri->username = (char *) osip_malloc (strlen(address) + 1);
+//        strcpy(omsg->req_uri->username, address);
+//
+//        // To:
+//        set_to_for_smsc(address, scp->scp_qmsg_it);
+//
+//        // Let them know that parsed part has been changed.
+//        scp->scp_qmsg_it->parsed_was_changed();
+//
+//        /*if (ISLOGGING(DEBUG)) {
+//            // Call make_text_valid() is needed for debug only.
+//            scp->scp_qmsg_it->make_text_valid();
+//            LOG(DEBUG) << "Updated SMS message: " << scp->scp_qmsg_it->text;
+//        }*/
+//        return SCA_RESTART_PROCESSING;
+//    }
 
     void pack_tpdu(short_msg_p_list::iterator &smsg) {
         // Pack RP-DATA to bitstream
@@ -237,8 +241,10 @@ namespace kneedeepbts::smqueue {
             unsigned reference = random() % 255;
             deliver = new SMS::TLDeliver(from, UD, TLPID);
             LOG(DEBUG) << "New TLDeliver: " << *deliver;
-            rp_data_new = new SMS::RPData(reference, SMS::RPAddress(gConfig.getStr("SMS.FakeSrcSMSC").c_str()),
-                                     *deliver);
+            // FIXME: This was in the config.
+            //std;;string rpaddr = gConfig.getStr("SMS.FakeSrcSMSC");
+            std::string rpaddr = "0000";
+            rp_data_new = new SMS::RPData(reference, SMS::RPAddress(rpaddr.c_str()), *deliver);
             LOG(DEBUG) << "New RPData: " << *rp_data_new;
         }
 

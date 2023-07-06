@@ -7,27 +7,142 @@
 
 #include "spdlog/spdlog.h"
 
+#include "smsc.h"
+
 namespace kneedeepbts::smqueue {
-    SmqManager::SmqManager(std::shared_ptr<cpptoml::table> config) {
-        m_config = config;
-        std::string savefile = m_config->get_as<std::string>("savefile");
-        m_writer = SmqWriter(savefile);
-        // FIXME: Should this be handled during this constructor, or as a preflight check in the main method, or in the "init before loop" methods?
-        // We need recursive attribute set
+    SmqManager::SmqManager(std::shared_ptr<cpptoml::table> config) : m_config(config) {}
+
+    void SmqManager::run() {
+        // Set the recursive attribute on the pthread mutex
         int mStatus = pthread_mutexattr_init(&mutexSLAttr);
         if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_init error: {}", mStatus); }
         pthread_mutexattr_settype(&mutexSLAttr, PTHREAD_MUTEX_RECURSIVE);
         if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_settype error: {}", mStatus); }
         pthread_mutex_init(&sortedListMutex, &mutexSLAttr);
         if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutex_init error: {}", mStatus); }
-        // FIXME: Should this be handled in the "init before loop" methods?
-        my_hlr.init();
-    }
 
-    void SmqManager::run() {
-        // FIXME: Work to not have to provide "this" to the SmqReader and SmqWriter.
+        // Initialize things
+        SPDLOG_INFO("Initializing the things for SmqManager.");
+        my_hlr.init();
+
+        // FIXME: What makes this the "reader" loop?
+        InitBeforeMainLoop();
+
+        // FIXME: What makes this the "reader" loop?
+        //InitInsideReaderLoop();
+        std::string content_type = *m_config->get_as<std::string>("globalrelay_type");
+        if (content_type == "text/plain") {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
+        } else if (content_type == "") {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
+        } else {
+            SPDLOG_ERROR("Bad Global Relay ContentType: {}", content_type);
+            // FIMXE: Error out here.
+        }
+
+        // FIXME: This should probably be handled in the main function in smqueue.cpp
+        // system() calls in back grounded jobs hang if stdin is still open on tty.  So, close it.
+        close(0); // Shut off stdin in case we're in background
+        open("/dev/null", O_RDONLY); // fill it with nullity
+
+        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<std::string>("port"));
+        SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
+        SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
+        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<std::string>("registry_port"));
+
+        // Run the reader and writer threads
+        SPDLOG_INFO("Starting the reader and writer threads.");
+        // FIXME: Should these be more of an async type model?
         m_reader.run();
         m_writer.run();
+
+        // Run the main_loop
+        SPDLOG_INFO("Starting the SmqManager main loop.");
+        while(!stop_main_loop) {
+            main_loop(60000);
+        }
+
+        // Cleanup after the main_loop
+        SPDLOG_INFO("Cleaning up after the SmqManager main loop.");
+        // FIXME: What makes this the "reader" loop?
+        //CleaupAfterMainreaderLoop();
+
+        save_queue_to_file();
+
+        // Free up any OSIP stuff, to make valgrind squeaky clean.
+        osip_mem_release();
+    }
+
+
+
+    void SmqManager::InitBeforeMainLoop() {
+        //m_NodeManager.start(45063);
+
+        //please_re_exec = false;
+        stop_main_loop = false;
+        //reexec_smqueue = false;
+
+        // Open the CDR file for appending.
+        std::string CDRFilePath = *m_config->get_as<std::string>("cdrfile");
+        if (CDRFilePath.length()) {
+            m_cdrfile = fopen(CDRFilePath.c_str(),"a");
+            if (!m_cdrfile) {
+                SPDLOG_ERROR("CDR file at {} could not be created or opened! errno ({}) {}", CDRFilePath.c_str(), errno, strerror(errno));
+            }
+        }
+
+        // Set up short-code commands users can type
+        // FIXME: Clean these up and re-apply.
+        //init_smcommands(&short_code_map);
+
+        // NOTE: Not going to worry about setting timeouts from the configuration file right now.
+//        if (gConfig.defines("SIP.Timeout.MessageResend")) {
+//            int int1 = gConfig.getNum("SIP.Timeout.MessageResend");
+//            LOG(DEBUG) << "Set SIP.Timeout.MessageResend value " <<  int1;
+//            // timeouts_REQUEST_MSG_DELIVERY[REQUEST_DESTINATION_SIPURL] = int1;  // svgfix
+//        }
+//
+//        if (gConfig.defines("SIP.Timeout.MessageBounce")) {
+//            int int2 = gConfig.getNum("SIP.Timeout.MessageBounce");
+//            LOG(DEBUG) << "Set SIP.Timeout.MessageBounce value " <<  int2;
+//            timeouts_REQUEST_DESTINATION_IMSI[DELETE_ME_STATE] = int2;
+//        }
+
+        //LOG(DEBUG) << "REQUEST_DESTINATION_SIPURL value " << REQUEST_DESTINATION_SIPURL;
+        //LOG(DEBUG) << "Timeout from 8 to 11 " << *SMqueue::timeouts[REQUEST_MSG_DELIVERY][REQUEST_DESTINATION_SIPURL];
+        //LOG(DEBUG) << "Timeout from 11 to 8 " << *SMqueue::timeouts[REQUEST_DESTINATION_SIPURL][REQUEST_MSG_DELIVERY];
+
+
+        // Port number that we (smqueue) listen on.
+        //if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
+        if (my_network.listen_on_port(*m_config->get_as<std::string>("port"))) {
+            SPDLOG_INFO("Got VALID port for smqueue to listen on");
+        } else {
+            SPDLOG_ERROR("Failed to get port for smqueue to listen on");
+        }
+
+        // Restore message queue
+//        savefile = gConfig.getStr("savefile").c_str();
+//        // Load queue on start up
+//        if (!read_queue_from_file(savefile)) {  // Load queue file on startup
+//            LOG(WARNING) << "Failed to read queue on startup from file " << savefile;
+//        }
+        read_queue_from_file();
+
+        // Set up Posix message queue limit
+        // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
+        FILE * gTempFile = nullptr;
+        int xTemp;
+        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","w");
+        if (!gTempFile) {
+            LOG(ALERT) << "Could not open " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
+        } else {
+            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
+            if (xTemp == 0){
+                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
+            }
+            fclose(gTempFile);
+        }
     }
 
 
@@ -37,9 +152,10 @@ namespace kneedeepbts::smqueue {
     void increase_acked_msg_timeout(ShortMsgPending *msg) {
         time_t timeout = SmqManager::INCREASEACKEDMSGTMOMS;
 
-        if (gConfig.defines("SIP.Timeout.ACKedMessageResend")) {
-            timeout = gConfig.getNum("SIP.Timeout.ACKedMessageResend");
-        }
+        // FIXME: Should timeouts come from the config?
+//        if (gConfig.defines("SIP.Timeout.ACKedMessageResend")) {
+//            timeout = gConfig.getNum("SIP.Timeout.ACKedMessageResend");
+//        }
 
         msg->set_state(msg->state, msg->msgettime() + timeout);
     }
@@ -158,7 +274,19 @@ namespace kneedeepbts::smqueue {
                 if (sent_msg->parsed &&
                     sent_msg->parsed->sip_method &&
                     0 == strcmp("MESSAGE", sent_msg->parsed->sip_method)) {
-                    sent_msg->write_cdr(my_hlr);
+                    //sent_msg->write_cdr(my_hlr);
+                    char * from = sent_msg->parsed->from->url->username;
+                    char * dest = sent_msg->parsed->to->url->username;
+                    time_t now = time(nullptr);  // Need real time for CDR
+
+                    if (m_cdrfile) {
+                        char * user = my_hlr.getIMSI2(from); // I am not a fan of this hlr call here. Probably a decent performance hit...
+                        // source, sourceIMSI, dest, date
+                        fprintf(m_cdrfile,"%s,%s,%s,%s", from, user, dest, ctime(&now));
+                        fflush(m_cdrfile);
+                    } else {
+                        SPDLOG_ERROR("CDR file at {} could not be created or opened!", *m_config->get_as<std::string>("cdrfile"));
+                    }
                 }
 
                 // Whether a response to a REGISTER or a MESSAGE, delete
@@ -244,7 +372,10 @@ namespace kneedeepbts::smqueue {
         time_t now = msgettime();
         short_msg_p_list::iterator qmsg;
         enum sm_state newstate;
+        uint32_t max_retries;
         int msSMSRateLimit;
+
+        SPDLOG_DEBUG("Queue size: {}", time_sorted_list.size());
 
         lockSortedList();
         //LOG(DEBUG) << "Begin process_timeout";
@@ -273,12 +404,7 @@ namespace kneedeepbts::smqueue {
 
         // Got message to process from queue
         LOG(DEBUG) << "Process message from SMS queue size: " << time_sorted_list.size();
-#undef DEBUG_Q
-#ifdef DEBUG_Q
-        LOG(DEBUG) << "===== Top of process timeout";
-	debug_dump();
-	LOG(DEBUG) << "===== End of queue =====";
-#else
+
         char timebuf[26+/*slop*/4];	//
         time_t now2 = time(nullptr);  // Using actual time
         ctime_r(&now2, timebuf);
@@ -289,7 +415,6 @@ namespace kneedeepbts::smqueue {
                   << sm_state_string(qmsg->state)
                   << " for " << qmsg->qtag;
 
-#endif
         LOG(DEBUG) << "Processing message in queue, state "  << sm_state_string(qmsg->state);
         switch (qmsg->state) {
             case INITIAL_STATE:
@@ -410,8 +535,9 @@ namespace kneedeepbts::smqueue {
                 }
 
                 // make sure messages eventually get discarded
-                if (gConfig.getNum("SMS.MaxRetries")) {
-                    if (qmsg->retries > gConfig.getNum("SMS.MaxRetries")) {
+                max_retries = m_config->get_as<uint32_t>("max_retires").value_or(3);
+                if (max_retries) {
+                    if (qmsg->retries > max_retries) {
                         LOG(INFO) << "MaxRetries: max retries exceeded, dropping message";
                         set_state(qmsg, DELETE_ME_STATE);
                         break;
@@ -421,7 +547,8 @@ namespace kneedeepbts::smqueue {
                 }
 
                 // limit messages to once-per-timeout if enabled
-                msSMSRateLimit = gConfig.getNum("SMS.RateLimit") * 1000;
+                //msSMSRateLimit = gConfig.getNum("SMS.RateLimit") * 1000;
+                msSMSRateLimit = m_config->get_as<uint32_t>("max_retires").value_or(0) * 1000;
                 if (msSMSRateLimit > 0) {
                     if (msSMSRateLimit >= spacingTimer.elapsed()) {
                         LOG(INFO) << "RateLimit: trying too soon, not sending yet";
@@ -552,7 +679,9 @@ namespace kneedeepbts::smqueue {
         ShortMsgPending *response;
         //osip_via_t *via;
         char *temp, *p, *mycallnum;
-        const char *myhost;
+        //const char *myhost;
+        std::string ipaddr = *m_config->get_as<std::string>("ip_address");
+        std::string udpport = *m_config->get_as<std::string>("udpport");
 
         smpl = new short_msg_p_list (1);
         response = &*smpl->begin();	// Here's our short_msg_pending!
@@ -564,12 +693,13 @@ namespace kneedeepbts::smqueue {
         if (!have_register_call_id || method != "REGISTER") {
             // If it's a MESSAGE, or if it's the first REGISTER,
             // it needs a new Call-ID.
-            myhost = my_ipaddress.c_str();
+            //myhost = my_ipaddress.c_str();
             mycallnum = my_network.new_call_number();
 
             osip_call_id_init(&response->parsed->call_id);
-            p = (char *)osip_malloc (strlen(myhost)+1);
-            strcpy(p, myhost);
+            // FIXME: Fix this so it doesn't use "c strings"
+            p = (char *)osip_malloc (strlen(ipaddr.c_str())+1);
+            strcpy(p, ipaddr.c_str());
             osip_call_id_set_host (response->parsed->call_id, p);
             p = (char *)osip_malloc (strlen(mycallnum)+1);
             strcpy(p, mycallnum);
@@ -579,8 +709,8 @@ namespace kneedeepbts::smqueue {
                 char *my_callid;
                 if (osip_call_id_to_str (response->parsed->call_id,
                                          &my_callid)) {
-                    LOG(DEBUG) << "Parse call ID failed can't continue"; // Can't continue
-                    return NULL;
+                    SPDLOG_DEBUG("Parse call ID failed can't continue"); // Can't continue
+                    return nullptr;
                 }
                 register_call_id = string(my_callid);
                 osip_free (my_callid);
@@ -590,8 +720,7 @@ namespace kneedeepbts::smqueue {
         } else if (method == "REGISTER") {
             // Copy the saved call-ID
             osip_call_id_init(&response->parsed->call_id);
-            osip_call_id_parse(response->parsed->call_id,
-                               register_call_id.c_str());
+            osip_call_id_parse(response->parsed->call_id, register_call_id.c_str());
         }
 
         ostringstream cseqline;
@@ -608,8 +737,8 @@ namespace kneedeepbts::smqueue {
         osip_message_set_method (response->parsed, osip_strdup(method.c_str()));
 
         ostringstream newvia;
-        newvia << "SIP/2.0/UDP " << my_ipaddress.c_str() << ":" << my_udp_port.c_str() << ";branch=1;received="
-               << "smqueue@Range.com";
+        // FIXME: What is this string used for?
+        newvia << "SIP/2.0/UDP " << ipaddr.c_str() << ":" << udpport.c_str() << ";branch=1;received=" << "smqueue@example.com";
         osip_message_append_via(response->parsed, newvia.str().c_str());
         // We've altered the text, and the parsed version controls.
         response->parsed_was_changed();
@@ -637,9 +766,11 @@ namespace kneedeepbts::smqueue {
         short_msg_p_list *smpl;
         ShortMsgPending *response;
         int errcode;
+        std::string ipaddr = *m_config->get_as<std::string>("ip_address");
+        std::string udpport = *m_config->get_as<std::string>("udpport");
 
         smpl = originate_half_sm("MESSAGE");
-        if (smpl == NULL) {
+        if (smpl == nullptr) {
             return -1;  // Returning -1 for error
         }
 
@@ -652,16 +783,17 @@ namespace kneedeepbts::smqueue {
         // I don't see any reason not to...why do we have three different
         // tag fields scattered around?
         ostringstream fromline;
-        fromline << from << "<sip:" << from << "@" << my_ipaddress << ">;tag="
+        fromline << from << "<sip:" << from << "@" << ipaddr << ">;tag="
                  << response->parsed->cseq->number;
         osip_message_set_from(response->parsed, fromline.str().c_str());
 
         ostringstream toline;
-        toline << "<sip:" << to << "@" << my_ipaddress << ">";
+        toline << "<sip:" << to << "@" << ipaddr << ">";
         osip_message_set_to(response->parsed, toline.str().c_str());
 
         ostringstream uriline;
-        uriline << "sip:" << to << "@" << my_ipaddress << ":" << gConfig.getStr("SIP.Default.BTSPort").c_str();
+        //uriline << "sip:" << to << "@" << ipaddr << ":" << gConfig.getStr("SIP.Default.BTSPort").c_str();
+        uriline << "sip:" << to << "@" << ipaddr << ":" << *m_config->get_as<std::string>("bts_port");
         osip_uri_init(&response->parsed->req_uri);
         osip_uri_parse(response->parsed->req_uri, uriline.str().c_str());
 
@@ -682,91 +814,17 @@ namespace kneedeepbts::smqueue {
         response->make_text_valid();
         response->unparse();
 
-        errcode = response->validate_short_msg(this, false);
+        errcode = response->validate_short_msg(false);
         if (errcode == 0) {
             insert_new_message (*smpl, firststate); // originate_sm
         }
         else {
-            LOG(DEBUG) << "Short message validate failed, error " << errcode;
+            SPDLOG_WARN("Short message validate failed, error {}", errcode);
         }
 
         delete smpl;
         return errcode ? -1 : 0;
     }
-
-
-    void SmqManager::InitInsideReaderLoop() {
-        // IP address:port of the Home Location Register that we send SIP
-        // REGISTER messages to.
-        //set_register_hostport(gConfig.getStr("Asterisk.address").c_str());
-
-        // IP address:port of the global relay where we sent SIP messages
-        // if we don't know where else to send them.
-        //string grIP = gConfig.getStr("SIP.GlobalRelay.IP");
-        //string grPort = gConfig.getStr("SIP.GlobalRelay.Port");
-//        string grContentType = gConfig.getStr("SIP.GlobalRelay.ContentType");
-//        if (grIP.length() && grPort.length() && grContentType.length()) {
-//            set_global_relay(grIP.c_str(), grPort.c_str(), grContentType.c_str());
-//        } else {
-//            set_global_relay("", "", "");
-//        }
-        std::string content_type = *m_config->get_as<std::string>("globalrelay_type");
-        if (content_type == "text/plain") {
-            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
-        } else if (content_type == "") {
-            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
-        } else {
-            SPDLOG_ERROR("Bad Global Relay ContentType: {}", content_type);
-            // FIMXE: Error out here.
-        }
-
-        // system() calls in back grounded jobs hang if stdin is still open on tty.
-        // So, close it.
-        close(0);     // Shut off stdin in case we're in background
-        open("/dev/null", O_RDONLY);   // fill it with nullity
-
-        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<std::string>("port"));
-        SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
-        SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
-        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<std::string>("registry_port"));
-
-        //savefile = gConfig.getStr("savefile").c_str();
-
-        // Took out code that dumped queue file on each timeout svg
-        // smq.debug_dump();
-
-    } // InitInsideReaderLoop
-
-
-    void SmqManager::CleaupAfterMainreaderLoop() {
-        // Main loop has exited program has been terminated
-
-        // The rest of this code never gets run (unless main_loop exits
-        // based upon getting a "reboot" sms or signal or something).
-        if (reexec_smqueue) {
-            LOG(WARNING) << "====== Re-Execing! ======";
-            if (!save_queue_to_file(savefile)) {  //Save file on shutdown
-                LOG(ERR) << "OUCH!  Could not save queue to file " << savefile;
-            }
-            please_re_exec = true;
-
-        } else {
-            please_re_exec = false;
-            LOG(NOTICE) << "====== Quitting! ======";
-            if (!save_queue_to_file(savefile)) {  //Save file on shutdown
-                LOG(ERR) << "OUCH!  Could not save queue to file " << savefile;
-            }
-            // smq.debug_dump();
-        }
-
-        // Free up any OSIP stuff, to make valgrind squeaky clean.
-        osip_mem_release();
-
-        if (please_re_exec)
-            execvp(argv[0], argv);
-
-    } // CleaupAfterMainreaderLoop
-
 
     /* Only called once */
     enum sm_state SmqManager::bounce_message(ShortMsgPending *sent_msg, const char *errstr) {
@@ -790,13 +848,16 @@ namespace kneedeepbts::smqueue {
 
         // Don't bounce a message from us - it makes endless loops.
         status = 1;
-        if (0 != strcmp(gConfig.getStr("Bounce.Code").c_str(), sent_msg->parsed->from->url->username))
+        // FIXME: What's a "Bounce Code"
+        //if (0 != strcmp(gConfig.getStr("Bounce.Code").c_str(), sent_msg->parsed->from->url->username))
+        if (0 != strcmp("Bounce.Code", sent_msg->parsed->from->url->username))
         {
             // But do bounce anything else.
             char *bounceto = sent_msg->parsed->from->url->username;
             bool bounce_to_imsi = 0 == strncmp("IMSI", bounceto, 4)
                                   || 0 == strncmp("imsi", bounceto, 4);
-            status = originate_sm(gConfig.getStr("Bounce.Code").c_str(), // Read from a config
+            //status = originate_sm(gConfig.getStr("Bounce.Code").c_str(), // Read from a config
+            status = originate_sm("Bounce.Code", // Read from a config
                                   bounceto,  // to his phonenum or IMSI
                                   errmsg.str().c_str(), // error msg
                                   bounce_to_imsi? REQUEST_DESTINATION_SIPURL: // dest is IMSI
@@ -810,74 +871,6 @@ namespace kneedeepbts::smqueue {
             return NO_STATE;	// Punt to debug.
         }
     }
-
-    void SmqManager::InitBeforeMainLoop() {
-        // Initialize
-        // TODO : post WebUI NG MVP
-        gNodeManager.start(45063);//, 31338);
-
-        please_re_exec = false;
-        stop_main_loop = false;
-        reexec_smqueue = false;
-
-        // Open the CDR file for appending.
-        std::string CDRFilePath = gConfig.getStr("CDRFile");
-        if (CDRFilePath.length()) {
-            gCDRFile = fopen(CDRFilePath.c_str(),"a");
-            if (!gCDRFile) {
-                LOG(ALERT) << "CDR file at " << CDRFilePath.c_str() << " could not be created or opened! errno " << errno << strerror(errno) << endl;
-            }
-        }
-
-        // Set up short-code commands users can type
-        init_smcommands(&short_code_map);
-
-        if (gConfig.defines("SIP.Timeout.MessageResend")) {
-            int int1 = gConfig.getNum("SIP.Timeout.MessageResend");
-            LOG(DEBUG) << "Set SIP.Timeout.MessageResend value " <<  int1;
-            // timeouts_REQUEST_MSG_DELIVERY[REQUEST_DESTINATION_SIPURL] = int1;  // svgfix
-        }
-
-        if (gConfig.defines("SIP.Timeout.MessageBounce")) {
-            int int2 = gConfig.getNum("SIP.Timeout.MessageBounce");
-            LOG(DEBUG) << "Set SIP.Timeout.MessageBounce value " <<  int2;
-            timeouts_REQUEST_DESTINATION_IMSI[DELETE_ME_STATE] = int2;
-        }
-
-        //LOG(DEBUG) << "REQUEST_DESTINATION_SIPURL value " << REQUEST_DESTINATION_SIPURL;
-        //LOG(DEBUG) << "Timeout from 8 to 11 " << *SMqueue::timeouts[REQUEST_MSG_DELIVERY][REQUEST_DESTINATION_SIPURL];
-        //LOG(DEBUG) << "Timeout from 11 to 8 " << *SMqueue::timeouts[REQUEST_DESTINATION_SIPURL][REQUEST_MSG_DELIVERY];
-
-
-        // Port number that we (smqueue) listen on.
-        if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
-            LOG(INFO) << "Got VALID port for smqueue to listen on";
-        } else {
-            LOG(INFO) << "Failed to get port for smqueue to listen on";
-        }
-
-        // Restore message queue
-        savefile = gConfig.getStr("savefile").c_str();
-        // Load queue on start up
-        if (!read_queue_from_file(savefile)) {  // Load queue file on startup
-            LOG(WARNING) << "Failed to read queue on startup from file " << savefile;
-        }
-
-        // Set up Posix message queue limit
-        FILE * gTempFile = NULL;
-        int xTemp;
-        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","w");
-        if (!gTempFile) {
-            LOG(ALERT) << "Could not open " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-        } else {
-            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
-            if (xTemp == 0){
-                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-            }
-            fclose(gTempFile);
-        }
-
-    } // InitBeforeMainLoop
 
 
 
@@ -900,7 +893,7 @@ namespace kneedeepbts::smqueue {
             return false;
         imsi = qmsg->parsed->from->url->username;
         callerid = my_hlr.getCLIDLocal(imsi);
-        return (callerid != NULL);
+        return (callerid != nullptr);
     }
 
 
@@ -926,11 +919,13 @@ namespace kneedeepbts::smqueue {
         ShortMsgPending *response;
         int errcode;
         char *imsi;
+        std::string reg_host = *m_config->get_as<std::string>("registry_host");
+        std::string reg_port = *m_config->get_as<std::string>("registry_port");
 
         LOG(DEBUG) << "Send register handset message";
 
         smpl = originate_half_sm("REGISTER");
-        if (smpl == NULL) {
+        if (smpl == nullptr) {
             return DELETE_ME_STATE;  // Returning DELETE_ME_STATE will make sure message gets deleted
         }
         response = &*smpl->begin();	// Here's our short_msg_pending!
@@ -942,7 +937,7 @@ namespace kneedeepbts::smqueue {
 
         // The To: line is the long-term name being registered.
         ostringstream toline;
-        toline << imsi << "<sip:" << imsi << "@" << my_register_hostport << ">";
+        toline << imsi << "<sip:" << imsi << "@" << reg_host << ":" << reg_port << ">";
         osip_message_set_to(response->parsed, toline.str().c_str());
 
         // The From: line is the same, plus a tag.
@@ -954,7 +949,7 @@ namespace kneedeepbts::smqueue {
 
         // URI in the first line: insert SIP HLR's host/port.
         ostringstream uriline;
-        uriline << "sip:" << my_register_hostport;
+        uriline << "sip:" << reg_host << ":" << reg_port;
         osip_uri_init(&response->parsed->req_uri);
         osip_uri_parse(response->parsed->req_uri, uriline.str().c_str());
 
@@ -979,7 +974,7 @@ namespace kneedeepbts::smqueue {
         response->make_text_valid();
         response->unparse();
 
-        errcode = response->validate_short_msg(this, false);
+        errcode = response->validate_short_msg(false);
         if (errcode != 0) {
             LOG(DEBUG) << "Register handset short message failed validation "  << errcode;
             delete smpl;
@@ -1025,7 +1020,7 @@ namespace kneedeepbts::smqueue {
         // Set up arguments and access pointers, then call
         // the short-code function to process it.
         params.scp_retries = qmsg->retries;
-        params.scp_smq = this;
+        //params.scp_smq = this;
         params.scp_qmsg_it = qmsg;
 
         LOG(INFO) << "Short-code SMS "
@@ -1061,7 +1056,7 @@ namespace kneedeepbts::smqueue {
                 return true;
 
             case SCA_EXEC_SMQUEUE:
-                reexec_smqueue = true;
+                //reexec_smqueue = true;
                 stop_main_loop = true;
                 next_state = DELETE_ME_STATE;
                 return true;
@@ -1126,6 +1121,8 @@ namespace kneedeepbts::smqueue {
     enum sm_state SmqManager::lookup_from_address(ShortMsgPending *qmsg) {
         char *host = qmsg->parsed->from->url->host;
         bool got_phone = false;  // Never updated
+        std::string ipaddr = *m_config->get_as<std::string>("ip_address");
+        std::string udpport = *m_config->get_as<std::string>("udpport");
 
         char *scheme = qmsg->parsed->from->url->scheme;
         if (!scheme) { LOG(ERR) << "no scheme";  return NO_STATE; }
@@ -1141,8 +1138,7 @@ namespace kneedeepbts::smqueue {
         // and also allows a remote SIP agent to reply to us.  (Maybe?)
 
         ostringstream newvia;
-        newvia << "SIP/2.0/UDP " << my_ipaddress.c_str() << ":" << my_udp_port.c_str() << ";branch=1;received="
-               << "smqueue@Range.com";
+        newvia << "SIP/2.0/UDP " << ipaddr << ":" << udpport << ";branch=1;received=" << "smqueue@example.com";
         osip_message_append_via(qmsg->parsed, newvia.str().c_str());
 
 
@@ -1334,13 +1330,16 @@ namespace kneedeepbts::smqueue {
                 LOG(NOTICE) << "Lookup phonenum '" << username << "' to IMSI failed";
                 LOG(DEBUG) << "MSG = " << qmsg->text;
 
-                if (global_relay.c_str()[0] == '\0') {
+                std::string global_relay_host = *m_config->get_as<std::string>("global_relay_host");
+                if (global_relay_host.c_str()[0] == '\0') { // FIXME: Change to len() == 0
                     // TODO : disabled, to disconnect SR from smqueue
                     // || !my_hlr.useGateway(username)) {
                     // There's no global relay -- or the HLR says not to
                     // use the global relay for it -- so send a bounce.
                     LOG(WARNING) << "no global relay defined; bouncing message intended for " << username;
-                    return bounce_message(qmsg, gConfig.getStr("Bounce.Message.NotRegistered").c_str());
+                    // FIXME: Replace this error message.  Probably should make/use a lookup class.
+                    //return bounce_message(qmsg, gConfig.getStr("Bounce.Message.NotRegistered").c_str());
+                    return bounce_message(qmsg, "Bounce.Message.NotRegistered");
                 } else {
                     // Global relay enabled
                     // Send the message to our global relay.
@@ -1350,7 +1349,7 @@ namespace kneedeepbts::smqueue {
                     //
                     // However, the From address is at this point the
                     // sender's local ph#.  Map it to the global ph#.
-                    LOG(INFO) << "using global SIP relay " << global_relay << " to route message to " << username;
+                    LOG(INFO) << "using global SIP relay " << global_relay_host << " to route message to " << username;
                     char *newfrom;
                     newfrom = my_hlr.mapCLIDGlobal(
                             qmsg->parsed->from->url->username);
@@ -1416,11 +1415,8 @@ namespace kneedeepbts::smqueue {
      * Helper function because C++ is fucked about types.
      * and the osip library doesn't keep its types straight.
      */
-    int
-    osip_via_clone2 (void *via, void **dest)
-    {
-        return osip_via_clone ((const osip_via_t *)via,
-                               (osip_via_t **)dest);
+    int osip_via_clone2 (void *via, void **dest) {
+        return osip_via_clone ((const osip_via_t *)via, (osip_via_t **)dest);
     }
 
 
@@ -1517,6 +1513,9 @@ namespace kneedeepbts::smqueue {
         char *newhost, *newport;
         const char *myhost;
 
+        std::string global_relay_host = *m_config->get_as<std::string>("global_relay_host");
+        std::string global_relay_port = *m_config->get_as<std::string>("global_relay_port");
+
         if (!imsi) { LOG(ERR) << "No IMSI"; return NO_STATE; }
 
         /* Username can be in various formats.  Check for formats that
@@ -1527,19 +1526,19 @@ namespace kneedeepbts::smqueue {
 
             // We have a phone number.  It needs translation.
             newport = strdup(global_relay_port.c_str());
-            newhost = strdup(global_relay.c_str());
+            newhost = strdup(global_relay_host.c_str());
             convert_content_type(qmsg, global_relay_contenttype);
             //qmsg->from_relay = true;
         } else {
             /* imsi is an IMSI at this point.  */
             LOG(DEBUG) << "We have an IMSI: " << imsi;
-            newport = NULL;
+            newport = nullptr;
             newhost = my_hlr.getRegistrationIP (imsi);
         }
 
         LOG(DEBUG) << "We are going to try to send to " << newhost << " on " << newport;
 
-        if (newhost && newport == NULL) {
+        if (newhost && newport == nullptr) {
             // Break up returned "host:port" string.
             char *colon = strchr(newhost,':');
             if (colon) {
@@ -1553,7 +1552,8 @@ namespace kneedeepbts::smqueue {
             newhost = strdup((char *)"127.0.0.1");
         }
         if (!newport) {
-            newport = strdup((char*)gConfig.getStr("SIP.Default.BTSPort").c_str()); //(char *)"5062");
+            //newport = strdup((char*)gConfig.getStr("SIP.Default.BTSPort").c_str()); //(char *)"5062");
+            newport = strdup((char*)"5062");
         }
 
 
@@ -1586,7 +1586,8 @@ namespace kneedeepbts::smqueue {
 
         // We've altered the message, it's a new message, and it needs
         // a new Call-ID so it won't be confused with the old message.
-        myhost = my_ipaddress.c_str();
+        //myhost = my_ipaddress.c_str();
+        std::string ipaddr = *m_config->get_as<std::string>("ip_address");
         mycallnum = my_network.new_call_number();
 
         if (!qmsg->parsed->call_id) {
@@ -1595,11 +1596,11 @@ namespace kneedeepbts::smqueue {
 
         //rfc 3261 relaxes this, don't require host -kurtis
         if (osip_call_id_get_host (qmsg->parsed->call_id)){
-            if (0 != strcmp(myhost,
+            if (0 != strcmp(ipaddr.c_str(),
                             osip_call_id_get_host(qmsg->parsed->call_id))) {
                 osip_free (osip_call_id_get_host(qmsg->parsed->call_id));
-                p = (char *)osip_malloc (strlen(myhost)+1);
-                strcpy(p, myhost);
+                p = (char *)osip_malloc (strlen(ipaddr.c_str())+1);
+                strcpy(p, ipaddr.c_str());
                 osip_call_id_set_host (qmsg->parsed->call_id, p);
                 qmsg->parsed_was_changed();
             }
@@ -1653,15 +1654,18 @@ namespace kneedeepbts::smqueue {
 
         if (len < 0) {
             // Error.
-            LOG(DEBUG) << "Error from get_next_dgram: " << strerror(errno);
+            SPDLOG_DEBUG("Error from get_next_dgram: {}", strerror(errno));
             // Just continue...
             return;
         } else if (len == 0) {
             // Timeout.  Just push things along.
-            LOG(DEBUG) << "Timeout wait for datagram";
+            SPDLOG_DEBUG("Timeout wait for datagram");
+            // FIXME: Is this the correct place for this?
+            //        Or should it be on a separate time thread?
+            process_timeout();
             return;
         } else {
-            LOG(DEBUG) << "Got incoming datagram length " << len;
+            SPDLOG_DEBUG("Got incoming datagram length: {}", len);
             // We got a datagram.  Dump it into the queue, copying it.
             //
             // Here we do a bit of tricky memory allocation.  Rather
@@ -1704,30 +1708,22 @@ namespace kneedeepbts::smqueue {
             if (errcode == 0) {
                 // Message good
                 if (MSG_IS_REQUEST(smp->parsed)) {
-                    LOG(NOTICE) << "Got SMS rqst qtag '"
-                                << smp->qtag << "' from "
-                                << smp->parsed->from->url->username
-                                << " for "
-                                << (smp->parsed->req_uri ? smp->parsed->req_uri->username : "");  // just shows smsc
+                    SPDLOG_INFO("Got SMS rqst qtag '{}' from {} for {}", smp->qtag, smp->parsed->from->url->username, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
                 } else {
-                    LOG(INFO) << "Got SMS "
-                              << smp->parsed->status_code
-                              << " Response qtag '"
-                              << smp->qtag <<  " for "
-                              << (smp->parsed->req_uri ? smp->parsed->req_uri->username : "");  // Name that was sent to smqueue
+                    SPDLOG_INFO("Got SMS {} Response qtag '{}' for {}", smp->parsed->status_code, smp->qtag, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
                 }
 
-// **********************************************************************
-// ****************** Insert a message in the queue *********************
+                // **********************************************************************
+                // ****************** Insert a message in the queue *********************
                 insert_new_message(*smpl); // Reader thread main_loop
                 errcode = 202;
                 // It's OK to reference "smp" here, whether it's in the
                 // smpl list, or has been moved into the main time_sorted_list.
-                queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // Send respond_sip_ack message to writer thread
+                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // Send respond_sip_ack message to writer thread
             } else {
                 // Message is bad not inserted in queue
-                LOG(WARNING) << "Received bad message, error " << errcode;
-                queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // SVG This might need to be removed for failed messages  Investigate
+                SPDLOG_WARN("Received bad message, error: {}", errcode);
+                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // SVG This might need to be removed for failed messages  Investigate
                 // Don't log message data it's invalid and should not be accessed
             }
 
@@ -1736,13 +1732,11 @@ namespace kneedeepbts::smqueue {
             // in its list.
             delete smpl;  // List entry that got added
         } // got datagram
-
-    } // SMq::main_loop
+    }
 
 
     /* Debug dump of SMq and mainly the queue. */
     void SmqManager::debug_dump() {
-
         time_t now = msgettime();
         LOG(DEBUG) << "Dump message queue";
         lockSortedList();
@@ -1763,10 +1757,12 @@ namespace kneedeepbts::smqueue {
      * We save in reverse timestamp order, to make it very fast to insert when
      * re-read.
      */
-    bool SmqManager::save_queue_to_file(std::string qfile) {
+    //bool SmqManager::save_queue_to_file(std::string qfile) {
+    bool SmqManager::save_queue_to_file() {
+        std::string qfile = *m_config->get_as<std::string>("savefile");
         ofstream ofile;
         unsigned howmany = 0;
-        LOG(DEBUG) << "save_queue_to_file:" << qfile;
+        SPDLOG_DEBUG("save_queue_to_file: {}", qfile);
 
         ofile.open(qfile.c_str(), ios::out | ios::binary | ios::trunc);
         if (!ofile.is_open())
@@ -1789,25 +1785,27 @@ namespace kneedeepbts::smqueue {
                   << x->need_repack << endl
                   << x->text << endl << endl;
             howmany++;
-            LOG(DEBUG) << "Write entry:" << howmany << " Len:" << strlen(x->text) << " MSG:" << x->text;
+            SPDLOG_DEBUG("Write entry: {}, Len: {}, MSG: {}", howmany, strlen(x->text), x->text);
         }
         unlockSortedList();
 
         bool result = !ofile.fail();
         ofile.close();
         if (result) {
-            LOG(INFO) << "Saved " << howmany << " queued messages to " << qfile;
+            SPDLOG_INFO("Saved {}} queued messages to {}", howmany, qfile);
         } else {
-            LOG(ERR) << "FAILED to save " << howmany << " queued messages to " << qfile;
+            SPDLOG_ERROR("FAILED to save {} queued messages to {}", howmany, qfile);
         }
         return result;
-    } //save_queue_to_file
+    }
 
 
     /*
      * Read a new queue from file.
      */
-    bool SmqManager::read_queue_from_file(std::string qfile) {
+    //bool SmqManager::read_queue_from_file(std::string qfile) {
+    bool SmqManager::read_queue_from_file() {
+        std::string qfile = *m_config->get_as<std::string>("savefile");
         ifstream ifile;
         std::string equals;
         unsigned astate, atime, alength;
@@ -1822,7 +1820,7 @@ namespace kneedeepbts::smqueue {
         short_msg_p_list *smpl;
         ShortMsgPending *smp;
         int errcode;
-        LOG(DEBUG) << "read_queue_from_file:" << qfile;
+        SPDLOG_DEBUG("read_queue_from_file: {}", qfile);
 
         ifile.open(qfile.c_str(), ios::in | ios::binary);
         if (!ifile.is_open())
@@ -1832,7 +1830,7 @@ namespace kneedeepbts::smqueue {
         while (!ifile.eof()) {
             ifile >> equals >> astate >> atime;
             if ((equals != "===") || (ifile.eof())) {  // === is the beginning of a record
-                LOG(DEBUG) << "End of smqueue file";
+                SPDLOG_DEBUG("End of smqueue file");
                 break;  // End of file
             }
             // LOG(DEBUG) << "Get next entry";
@@ -1851,7 +1849,7 @@ namespace kneedeepbts::smqueue {
             while (ifile.peek() == '\n')
                 ignoreme = ifile.get();  // Skip blanks
             howmany++;
-            mystate = (SMqueue::sm_state)astate;
+            mystate = (sm_state)astate;
             mytime = atime;
 
             smpl = new short_msg_p_list (1);
@@ -1866,46 +1864,36 @@ namespace kneedeepbts::smqueue {
 
             smp->srcaddrlen = 0;
             if (!my_network.parse_addr(netaddrstr.c_str(), smp->srcaddr, sizeof(smp->srcaddr), &smp->srcaddrlen)) {
-                LOG(DEBUG) << "Parse Network address failed";
+                SPDLOG_DEBUG("Parse Network address failed");
                 continue;
             }
-            errcode = smp->validate_short_msg(this, false);
+            errcode = smp->validate_short_msg(false);
             if (errcode == 0) {
                 if (MSG_IS_REQUEST(smp->parsed)) {
-                    LOG(INFO) << "Read SMS '"
-                              << smp->qtag << "' from "
-                              << smp->parsed->from->url->username
-                              << " for "
-                              << smp->parsed->req_uri->username
-                              << " direction=" << (smp->ms_to_sc?"MS->SC":"SC->MS")
-                              << " need_repack=" << (smp->need_repack?"true":"false");
+                    SPDLOG_INFO("Read SMS '{}' from {} for {} direction={} need_repack={}",
+                                smp->qtag, smp->parsed->from->url->username, smp->parsed->req_uri->username,
+                                (smp->ms_to_sc?"MS->SC":"SC->MS"), (smp->need_repack?"true":"false"));
                     // Fixed error where invalid messages were getting put in the queue
                     insert_new_message (*smpl, mystate, mytime); // In read_queue_from_file
                 } else {
-                    LOG(DEBUG) << "Read bad SMS "
-                               << smp->parsed->status_code
-                               << " Response '"
-                               << smp->qtag << "':" << msgtext;
+                    SPDLOG_INFO("Read bad SMS {} Response '{}':{}", smp->parsed->status_code, smp->qtag, msgtext);
                     howmanyerrs++;
                 }
             } else {
-                LOG(WARNING) << "Received bad message, error " << errcode;
+                SPDLOG_WARN("Received bad message, error {}", errcode);
                 // Don't log message data it's invalid and should not be accessed
                 howmanyerrs++;
                 // Continue to next message
             }
             delete smpl;
         }  // Message loop
-        LOG(INFO) << "=== Read " << howmany << " messages total, " << howmanyerrs
-                  << " bad ones.";
+        SPDLOG_INFO("=== Read {} messages total, {} bad ones.", howmany, howmanyerrs);
 
         // If errors clear file so we don't process again if a restart happens because the file is bad
         if (howmanyerrs != 0) ifile.clear();
-
         ifile.close();
-
         return true;
-    } // read_queue_from_file
+    }
 
     // Moved from ShortMsgPending as it needs access to the SmqManager
     /*
@@ -1958,6 +1946,8 @@ namespace kneedeepbts::smqueue {
         size_t clen;
         char *fromtag;
         char *endptr;
+        std::string global_relay_host = *m_config->get_as<std::string>("global_relay_host");
+        std::string global_relay_port = *m_config->get_as<std::string>("global_relay_port");
 
         // FIXME: Need to handle debug logging in a better way.
 //        if (print_as_we_validate) {    // debugging
@@ -2186,9 +2176,11 @@ namespace kneedeepbts::smqueue {
         // We need to see if this is a message form the relay. If it is, we can process a user lookup here
         // BUT ONLY IF the message is not a response (ACK) AND MUST BE a SIP MESSAGE.
         if (should_early_check && !MSG_IS_RESPONSE(p) && (0 == strcmp("MESSAGE", p->sip_method))
-            && (my_network.msg_is_from_relay(smp->srcaddr, smp->srcaddrlen, global_relay.c_str(), global_relay_port.c_str()) ||
-                (gConfig.getBool("SIP.GlobalRelay.RelaxedVerify") &&
-                 relaxed_verify_relay(&p->vias, global_relay.c_str(), global_relay_port.c_str())
+            && (my_network.msg_is_from_relay(smp->srcaddr, smp->srcaddrlen, global_relay_host.c_str(), global_relay_port.c_str()) ||
+                // FIXME: From config:
+                //(gConfig.getBool("SIP.GlobalRelay.RelaxedVerify") &&
+                (true &&
+                 relaxed_verify_relay(&p->vias, global_relay_host.c_str(), global_relay_port.c_str())
                 ))) {
             // We cannot deliver the message since we cannot resolve the TO
             if (!to_is_deliverable(user)) {

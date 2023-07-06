@@ -776,19 +776,19 @@ int main(int argc, char **argv)
     spdlog::debug("debug mode is enabled");
 
     SPDLOG_INFO("smqueue Starting");
-    kneedeepbts::smqueue::SmqManager smq_manager = kneedeepbts::smqueue::SmqManager(&config_smqueue);
+    kneedeepbts::smqueue::SmqManager smq_manager = kneedeepbts::smqueue::SmqManager(config_smqueue);
 
     smq_manager.run();
 
     // Start tester threads
-    StartTestThreads();  // Disabled in in function StartTestThreads
+    //StartTestThreads();  // Disabled in in function StartTestThreads
 
     // Don't let thread exit
     // FIXME: C++ equivalent to join thread?
     // FIXME: Also should gracefully handles signals like SIGTERM (ctrl+c).
-    while (!smq_manager.stop_main_loop) {
-        msSleep(2000);
-    }
+//    while (!smq_manager.stop_main_loop) {
+//        msSleep(2000);
+//    }
 
     return 0;
 }

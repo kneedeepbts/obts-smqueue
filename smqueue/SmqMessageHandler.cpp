@@ -1,21 +1,7 @@
-/*
-* Copyright 2008 Free Software Foundation, Inc.
-* Copyright 2011, 2013, 2014 Range Networks, Inc.
-*
-* This software is distributed under multiple licenses;
-* see the COPYING file in the main directory for licensing
-* information for this specific distribuion.
-*
-* This use of this software may be subject to additional restrictions.
-* See the LEGAL file in the main directory for details.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-*/
 #include "SmqMessageHandler.h"
 
-#include "smqueue.h"
+#include "spdlog/spdlog.h"
+
 #include "QueuedMsgHdrs.h"
 
 namespace kneedeepbts::smqueue {
@@ -55,7 +41,7 @@ namespace kneedeepbts::smqueue {
         int returnValue;
         int ret;
 
-        //LOG(DEBUG) << "Sending message to queue:" << getQueueName();;
+        SPDLOG_DEBUG("Sending message to queue: {}", getQueueName());
 
         // Wait for queue to open
         while (!queueOpened()) {
@@ -222,36 +208,36 @@ namespace kneedeepbts::smqueue {
     }
 
 
-    /*
-     * Send a QueuedMsgHdrs to writer queue
-     * Deleted SimpleWrapper receiver deletes attached message
-     */
-    int SendWriterMsg(SimpleWrapper* pMsg) {
-        int iret;
-        iret = smqWriter->getqueHan()->SmqSendMessage(pMsg);
-        delete pMsg;  // Delete SimpleWrapper
-        return iret;
-    }
-
-
-    /*
-        Send a message to the writer thread asking for a sip ack to be sent
-     */
-    void queue_respond_sip_ack(int errcode, kneedeepbts::smqueue::ShortMsgPending *shortmsg, char * netaddr, size_t netaddrlen) {
-        LOG(DEBUG) << "Send SIP ACK queue request";
-        QueuedMsgHdrs* pMsg = new SIPAckMessage(errcode, shortmsg, netaddr, netaddrlen);
-        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
-        SendWriterMsg(sWrap);  // Message gets deleted in here
-    }
-
-
-    // Signal writer thread to process incoming message
-    void ProcessReceivedMsg() {
-        LOG(DEBUG) << "Signal writer thread ProcessReceivedMsg";
-        QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
-        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
-        SendWriterMsg(sWrap);
-    }
+//    /*
+//     * Send a QueuedMsgHdrs to writer queue
+//     * Deleted SimpleWrapper receiver deletes attached message
+//     */
+//    int SendWriterMsg(SimpleWrapper* pMsg) {
+//        int iret;
+//        iret = smqWriter->getqueHan()->SmqSendMessage(pMsg);
+//        delete pMsg;  // Delete SimpleWrapper
+//        return iret;
+//    }
+//
+//
+//    /*
+//        Send a message to the writer thread asking for a sip ack to be sent
+//     */
+//    void queue_respond_sip_ack(int errcode, kneedeepbts::smqueue::ShortMsgPending *shortmsg, char * netaddr, size_t netaddrlen) {
+//        LOG(DEBUG) << "Send SIP ACK queue request";
+//        QueuedMsgHdrs* pMsg = new SIPAckMessage(errcode, shortmsg, netaddr, netaddrlen);
+//        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
+//        SendWriterMsg(sWrap);  // Message gets deleted in here
+//    }
+//
+//
+//    // Signal writer thread to process incoming message
+//    void ProcessReceivedMsg() {
+//        LOG(DEBUG) << "Signal writer thread ProcessReceivedMsg";
+//        QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
+//        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
+//        SendWriterMsg(sWrap);
+//    }
 
 
     // Only used for testing

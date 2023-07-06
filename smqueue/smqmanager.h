@@ -40,7 +40,7 @@ namespace kneedeepbts::smqueue {
         ~SmqManager() { pthread_mutex_destroy(&sortedListMutex); }
 
         void InitBeforeMainLoop();
-        void CleaupAfterMainreaderLoop();
+        //void CleaupAfterMainreaderLoop();
         void InitInsideReaderLoop();
 
         void unlockSortedList() { pthread_mutex_unlock(&sortedListMutex); }
@@ -49,7 +49,7 @@ namespace kneedeepbts::smqueue {
 
         void osip_mem_release();
 
-        // This is the method to initialliz and then run the main_loop
+        // This is the method to initialize and then run the main_loop
         void run();
 
 //        /* Set my own IP address, since I can't tell how I look to others. */
@@ -84,10 +84,10 @@ namespace kneedeepbts::smqueue {
 
         // FIXME: This should be pulled out into a "tcp/udp server" class.
         /* Initialize the listener -- sets up and opens my_network. */
-        bool init_listener (std::string port) {
-            //my_udp_port = port;
-            return my_network.listen_on_port (port);
-        }
+//        bool init_listener (std::string port) {
+//            //my_udp_port = port;
+//            return my_network.listen_on_port (port);
+//        }
 
         bool to_is_deliverable(const char *username);
         bool from_is_deliverable(const char *from);
@@ -114,9 +114,7 @@ namespace kneedeepbts::smqueue {
          * msgtext is plain ASCII text.
          * Result is 0 for success, negative for error.
          */
-        int
-        originate_sm(const char *from, const char *to, const char *msgtext,
-                     enum sm_state firststate);
+        int originate_sm(const char *from, const char *to, const char *msgtext, enum sm_state firststate);
 
         /*
          * Originate half of a short message
@@ -205,7 +203,7 @@ namespace kneedeepbts::smqueue {
             // Low timeout will cause this msg to be at front of queue.
             unlockSortedList();
             debug_dump(); //svgfix
-            ProcessReceivedMsg();
+            m_writer.ProcessReceivedMsg();
         }
 
         // This version lets the initial state be set.
@@ -218,7 +216,7 @@ namespace kneedeepbts::smqueue {
             // Low timeout will cause this msg to be at front of queue.
             unlockSortedList();
             debug_dump(); //svgfix
-            ProcessReceivedMsg();
+            m_writer.ProcessReceivedMsg();
         }
         // This version lets the state and timeout be set.
         void insert_new_message(short_msg_p_list &smp, enum sm_state s, time_t t) {
@@ -231,7 +229,8 @@ namespace kneedeepbts::smqueue {
             //ProcessReceivedMsg();
             QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
             SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
-            SendWriterMsg(sWrap);
+            //SendWriterMsg(sWrap);
+            m_writer.getqueHan()->SmqSendMessage(sWrap);
         }
 
         /* Debug dump of the queue and the SMq class in general. */
@@ -307,8 +306,10 @@ namespace kneedeepbts::smqueue {
            Reading a queue file doesn't delete things that might already
             be in the queue; if you want a clean queue, delete anything
            already in the queue first.  */
-        bool save_queue_to_file(std::string qfile);
-        bool read_queue_from_file(std::string qfile);
+        //bool save_queue_to_file(std::string qfile);
+        bool save_queue_to_file();
+        //bool read_queue_from_file(std::string qfile);
+        bool read_queue_from_file();
 
         /* Check that the message is valid, and set the qtag and qtaghash
            from the message's contents.   Result is 0 for valid, or
@@ -354,22 +355,23 @@ namespace kneedeepbts::smqueue {
 
         /* Set this to true when you want the program to re-exec itself
            instead of terminating after the main loop stops.  */
-        bool reexec_smqueue = false; // FIXME: Is this necessary?
+        //bool reexec_smqueue = false; // FIXME: Is this necessary?
 
         // Bringing here from smqueue "global"
         //bool print_as_we_validate = false;
         bool osip_initialized = false;
         struct osip *osipptr = nullptr; // Ptr to struct sorta used by library
-        FILE * gCDRFile = nullptr;
+        FILE * m_cdrfile = nullptr;
+        short_code_map_t short_code_map{};
 
         /** The remote node manager. */
-        NodeManager gNodeManager;
+        //NodeManager m_NodeManager;
 
         /** rate limiting timer */
         Timeval spacingTimer;
 
         SmqReader m_reader{};
-        SmqWriter m_writer;
+        SmqWriter m_writer{};
     };
 }
 

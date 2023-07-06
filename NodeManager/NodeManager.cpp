@@ -34,10 +34,10 @@ void* NodeManager::commandsLoop(void*)
 	// (pat) You make it a static method and call it via NodeManager::commandLoop.
 	// In general, 'this' would be passed as the void* arg, which allows multiple instances, instead of using gNodeManager.
 
-	extern NodeManager gNodeManager;
+	//extern NodeManager gNodeManager;
 	try {
 		// This errors out when OpenBTS exits.
-		gNodeManager.commandsWorker(NULL);
+		//gNodeManager.commandsWorker(NULL);
 	} catch (...) {
 		LOG(INFO) << "Exception occurred in NodeManager";	// (pat 3-2014) added.  Evidently this happens regularly, so make it an INFO message.
 	}

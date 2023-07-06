@@ -24,7 +24,7 @@
 
 #include <string>
 
-#include <Logger.h>
+#include "spdlog/spdlog.h"
 
 #include "QueuedMsgHdrs.h"
 #include "SmqMessageHandler.h"
@@ -36,8 +36,16 @@ namespace kneedeepbts::smqueue {
         delete mqueHan;
     }
 
+    void SmqWriter::run() {
+        pthread_create(&mthread_ID, nullptr, SmqWriterThread, (void *) nullptr);
+    }
+
+    void SmqWriter::stop() {
+        stop_thread = true;
+    }
+
     void *SmqWriter::SmqWriterThread(void *ptr) {
-        LOG(DEBUG) << "Start SMQ writer thread";
+        SPDLOG_DEBUG("Start SMQ writer thread");
 
         SmqWriter * smqw = (SmqWriter *) ptr;
 
@@ -53,41 +61,49 @@ namespace kneedeepbts::smqueue {
         // Queue opened  Process messages
         currentSeconds = getCurrentSeconds();
         lastRunSeconds = currentSeconds;
-        LOG(DEBUG) << "Enter writer thread loop";
-        while (!smqw->smq_manager->stop_main_loop) {
+        SPDLOG_DEBUG("Enter writer thread loop");
+        while (!smqw->stop_thread) {
 
             //LOG(DEBUG) <<"Start SMQ writer thread loop";
             bytesRead = smqw->getqueHan()->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
             currentSeconds = getCurrentSeconds();
-            //LOG(DEBUG) << "Got return from SmqWaitforMessage in writer status:" << bytesRead;
+            SPDLOG_DEBUG("Got return from SmqWaitforMessage in writer, status: {}", bytesRead);
             if (bytesRead < 0) {
-                LOG(DEBUG) << "Writer failed to get message:" << bytesRead;
+                SPDLOG_DEBUG("Writer failed to get message:", bytesRead);
 
             } else if (bytesRead == 0) {
                 // ******** Got timeout ***************
-                //LOG(DEBUG) << "Got timeout in writer thread";
+                SPDLOG_DEBUG("Got timeout in writer thread");
 
-                smq_manager->process_timeout();  // Process entries in queue
+                // NOTE: This appears to be getting bytes from a buffer (or mqueue?)
+                //       and placing them into messages.  If no bytes are gathered,
+                //       then the queue is processed.  This is a very naive loop,
+                //       and appears to be placed in the completely wrong place.
+
+//                smq_manager->process_timeout();  // Process entries in queue
                 //LOG(DEBUG) << "Return from process_timeout";
 
-                if ((currentSeconds - lastRunSeconds) > 60) {
-                    LOG(DEBUG) << "Run once a minute stuff";
-                    smq_manager->InitInsideReaderLoop(); // Updates configuration
-
-                    int queueSize = smqw->smq_manager->time_sorted_list.size();
-                    if (queueSize > 0) { LOG(DEBUG) << "Queue size " << queueSize; }
-                    // Save queue to file on timeout
-                    //LOG(DEBUG) << "Enter save_queue_to_file";
-                    if (!smq_manager->save_queue_to_file(
-                            smqw->smq_manager->savefile)) {  // Save queue file each timeout  may want to slow this down
-                        LOG(WARNING) << "Failed to read queue file on timeout file:" << smqw->smq_manager->savefile;
-                    }
-                    lastRunSeconds = currentSeconds;
-                }
+//                if ((currentSeconds - lastRunSeconds) > 60) {
+//                    LOG(DEBUG) << "Run once a minute stuff";
+//                    // NOTE: Why would this need to be re-run?  We can restart if the config changes.
+//                    //smq_manager->InitInsideReaderLoop(); // Updates configuration
+//
+////                    int queueSize = smqw->smq_manager->time_sorted_list.size();
+////                    if (queueSize > 0) {
+////                        SPDLOG_DEBUG("Queue size: {}", queueSize);
+////                    }
+//
+//                    // Save queue to file on timeout
+//                    //LOG(DEBUG) << "Enter save_queue_to_file";
+////                    if (!smq_manager->save_queue_to_file()) {  // Save queue file each timeout  may want to slow this down
+////                        //LOG(WARNING) << "Failed to read queue file on timeout file:" << smqw->smq_manager->savefile;
+////                    }
+//                    lastRunSeconds = currentSeconds;
+//                }
 
             } else if (bytesRead > 0) {
                 // ********* Got message *************
-                //LOG(DEBUG) << "Received message in writer thread length:" << bytesRead;
+                SPDLOG_DEBUG("Received message in writer thread length: {}", bytesRead);
                 pWrap = (SimpleWrapper *) msgBuffer;
                 pMsg = pWrap->getMsgPtr();
 
@@ -98,7 +114,39 @@ namespace kneedeepbts::smqueue {
             } // Got message
         } // while
 
-        LOG(DEBUG) << "End SMQ writer thread";
-        return NULL;
+        SPDLOG_DEBUG("End SMQ writer thread");
+        return nullptr;
+    }
+
+
+    /*
+     * Send a QueuedMsgHdrs to writer queue
+     * Deleted SimpleWrapper receiver deletes attached message
+     */
+    int SmqWriter::SendWriterMsg(SimpleWrapper* pMsg) {
+        int iret;
+        iret = getqueHan()->SmqSendMessage(pMsg);
+        delete pMsg;  // Delete SimpleWrapper
+        return iret;
+    }
+
+
+    /*
+        Send a message to the writer thread asking for a sip ack to be sent
+     */
+    void SmqWriter::queue_respond_sip_ack(int errcode, kneedeepbts::smqueue::ShortMsgPending *shortmsg, char * netaddr, size_t netaddrlen) {
+        LOG(DEBUG) << "Send SIP ACK queue request";
+        QueuedMsgHdrs* pMsg = new SIPAckMessage(errcode, shortmsg, netaddr, netaddrlen);
+        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
+        SendWriterMsg(sWrap);  // Message gets deleted in here
+    }
+
+
+    // Signal writer thread to process incoming message
+    void SmqWriter::ProcessReceivedMsg() {
+        LOG(DEBUG) << "Signal writer thread ProcessReceivedMsg";
+        QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
+        SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
+        SendWriterMsg(sWrap);
     }
 }

@@ -231,8 +231,7 @@ namespace kneedeepbts::smqueue {
 //        /* Check that the message is valid, and set the qtag and qtaghash
 //           from the message's contents.   Result is 0 for valid, or
 //           SIP response error code (e.g. 405).  */
-//        // FIXME: This causes a circular dependency between SmqManager and this class
-//        int validate_short_msg(SmqManager *manager, bool should_early_check);
+        int validate_short_msg(bool should_early_check);
 
         // Set the qtag and qtaghash from the parsed fields.
         // Whenever we change any of these fields, we have to recalculate
@@ -251,7 +250,7 @@ namespace kneedeepbts::smqueue {
         check_host_port(char *host, char *port);
 
         /* Generate a billing record. */
-        void write_cdr(FILE * cdrfile, SubscriberRegistry &hlr) const;
+        //void write_cdr(FILE * cdrfile, SubscriberRegistry &hlr) const;
     };
 
     typedef std::list<ShortMsgPending> short_msg_p_list;

@@ -101,7 +101,7 @@ errno
 
         // Send functions
         int SmqSendMessage(SimpleWrapper *pMsg);
-        int SendWriterMsg(SimpleWrapper* pMsg);
+        //int SendWriterMsg(SimpleWrapper* pMsg);
 
     private:
         // Message queue

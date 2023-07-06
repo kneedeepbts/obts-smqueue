@@ -48,15 +48,16 @@ namespace kneedeepbts::smqueue {
         int bytesRead = 0;
         int msgCount = 0;
 
-        smq_manager->InitBeforeMainLoop();
-        smq_manager->InitInsideReaderLoop(); // Updates configuration  do here to make sure everything is setup for threads
+//        smq_manager->InitBeforeMainLoop();
+//        smq_manager->InitInsideReaderLoop(); // Updates configuration  do here to make sure everything is setup for threads
 
         // Queue opened  Process messages
-        LOG(DEBUG) << "Enter reader thread loop";
-        while (!smq_manager->stop_main_loop) {
+//        LOG(DEBUG) << "Enter reader thread loop";
+//        while (!smq_manager->stop_main_loop) {
+//
+//            smq_manager->main_loop(60000);
 
-            smq_manager->main_loop(60000);
-
+// FIXME: Is the below in the main_loop?
 #if 0
             // Put this back in if process messages in reader thread
             LOG(DEBUG) <<"Start SMQ reader thread loop";
@@ -99,12 +100,12 @@ namespace kneedeepbts::smqueue {
 #endif
             }
 #endif
-        } // while
+        //} // while
 
-        smq_manager->CleaupAfterMainreaderLoop();
-
-        LOG(DEBUG) << "End SMQ reader thread";
-        return NULL;
+//        smq_manager->CleaupAfterMainreaderLoop();
+//
+//        LOG(DEBUG) << "End SMQ reader thread";
+        return nullptr;
     }
 
 }
