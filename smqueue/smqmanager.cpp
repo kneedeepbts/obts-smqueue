@@ -134,16 +134,16 @@ namespace kneedeepbts::smqueue {
         // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
         FILE * gTempFile = nullptr;
         int xTemp;
-        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","w");
+        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","r");
         if (!gTempFile) {
-            LOG(ALERT) << "Could not open " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-        } else {
-            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
-            if (xTemp == 0){
-                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-            }
-            fclose(gTempFile);
+            SPDLOG_WARN("Could not open '/proc/sys/fs/mqueue/msg_max', errno ({}) {}", errno, strerror(errno));
+//        } else {
+//            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
+//            if (xTemp == 0){
+//                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
+//            }
         }
+        fclose(gTempFile);
     }
 
 
