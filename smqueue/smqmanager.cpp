@@ -1644,7 +1644,7 @@ namespace kneedeepbts::smqueue {
         //time_t now;
         int errcode;
 
-        //LOG(DEBUG) << "Start SMq::main_loop (get SIP messages tmo:" << msTMO << ")";
+        SPDLOG_DEBUG("Start SMq::main_loop (get SIP messages tmo: {})", msTMO);
 
         // No message at this point
         // READ
