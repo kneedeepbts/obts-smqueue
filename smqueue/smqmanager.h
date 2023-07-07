@@ -370,7 +370,7 @@ namespace kneedeepbts::smqueue {
         /** rate limiting timer */
         Timeval spacingTimer;
 
-        SmqReader m_reader{};
+        SmqReader m_reader;
         SmqWriter m_writer{};
     };
 }
