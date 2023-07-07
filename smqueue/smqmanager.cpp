@@ -67,7 +67,7 @@ namespace kneedeepbts::smqueue {
             if(i < 1) {
                 stop_main_loop = true;
             }
-            i++;
+            i--; // derp.
         }
 
         // Cleanup after the main_loop
