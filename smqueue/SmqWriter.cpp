@@ -59,6 +59,9 @@ namespace kneedeepbts::smqueue {
         unsigned long lastRunSeconds;
         ShortMsgPending pendingMsg;
 
+        // Moving into the Thread to try to solve pointer non-sense
+        SmqMessageHandler * mqueHan = new SmqMessageHandler(SmqWriter::MQ_NAME);
+
         // Queue opened  Process messages
         currentSeconds = getCurrentSeconds();
         lastRunSeconds = currentSeconds;
@@ -66,7 +69,9 @@ namespace kneedeepbts::smqueue {
         while (!smqw->stop_thread) {
 
             //LOG(DEBUG) <<"Start SMQ writer thread loop";
-            bytesRead = smqw->getqueHan()->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
+            // FIXME: Pretty sure there's a seg fault happening here.  Probably because of the pointer non-sense.
+            //bytesRead = smqw->getqueHan()->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
+            bytesRead = mqueHan->SmqWaitforMessage(200, msgBuffer, (int) sizeof(msgBuffer));
             currentSeconds = getCurrentSeconds();
             SPDLOG_DEBUG("Got return from SmqWaitforMessage in writer, status: {}", bytesRead);
             if (bytesRead < 0) {

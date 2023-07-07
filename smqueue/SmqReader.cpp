@@ -1,52 +1,51 @@
-/*
-* Copyright 2008 Free Software Foundation, Inc.
-* Copyright 2011, 2013, 2014 Range Networks, Inc.
-*
-* This software is distributed under multiple licenses;
-* see the COPYING file in the main directory for licensing
-* information for this specific distribuion.
-*
-* This use of this software may be subject to additional restrictions.
-* See the LEGAL file in the main directory for details.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-*/
-
-/*
- * SmqReader.cpp
- *
- *  Created on: Nov 16, 2013
- *      Author: Scott Van Gundy
- */
-
-#include <string>
-#include "smqueue.h"
-#include "QueuedMsgHdrs.h"
-#include "SmqMessageHandler.h"
 #include "SmqReader.h"
 
-#include <Logger.h>
+#include <string>
+
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
+#include "spdlog/spdlog.h"
+
+//#include "QueuedMsgHdrs.h"
+//#include "SmqMessageHandler.h"
 
 namespace kneedeepbts::smqueue {
-    std::string SmqReader::MQ_NAME = "/SmqReader";
+//    std::string SmqReader::MQ_NAME = "/SmqReader";
 
-    SmqReader::~SmqReader() {
-        delete mqueHan;
+//    SmqReader::~SmqReader() {
+//        delete mqueHan;
+//    }
+
+    std::thread SmqReader::run() {
+        return std::thread(&SmqReader::reader_thread, this);
     }
 
-    void SmqReader::run() {
-        pthread_create(&mthread_ID, nullptr, SmqReaderThread, (void *) nullptr);
+    void SmqReader::stop() {
+        m_stop_thread = true;
+    }
+
+    void SmqReader::reader_thread() {
+        SPDLOG_DEBUG("Starting the reader thread.");
+
+        while(!m_stop_thread) {
+            SPDLOG_DEBUG("Pushing a SimpleWrapper onto the queue.");
+            m_tsq.push(SimpleWrapper(nullptr));
+            sleep(1);
+            SPDLOG_DEBUG("Fronting a SimpleWrapper from the queue.");
+            SimpleWrapper tmp = m_tsq.front();
+            sleep(1);
+            SPDLOG_DEBUG("Popping a SimpleWrapper from the queue.");
+            m_tsq.pop();
+            sleep(1);
+        }
     }
 
     // FIXME: This whole structure is bass-ackwards.  The smq_manager should run the main loop, not the reader.
     void *SmqReader::SmqReaderThread(void *ptr) {
         LOG(DEBUG) << "Start SMQ reader thread";
 
-        char msgBuffer[MQ_MESSAGE_MAX_SIZE + 10];  // Must be larger than size speced in attr
-        int bytesRead = 0;
-        int msgCount = 0;
+        //char msgBuffer[MQ_MESSAGE_MAX_SIZE + 10];  // Must be larger than size speced in attr
+        //int bytesRead = 0;
+        //int msgCount = 0;
 
 //        smq_manager->InitBeforeMainLoop();
 //        smq_manager->InitInsideReaderLoop(); // Updates configuration  do here to make sure everything is setup for threads

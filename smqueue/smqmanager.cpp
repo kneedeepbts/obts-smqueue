@@ -55,7 +55,7 @@ namespace kneedeepbts::smqueue {
         SPDLOG_INFO("Starting the reader and writer threads.");
         // FIXME: Should these be more of an async type model?
         m_reader.run();
-        m_writer.run();
+        //m_writer.run();
 
         // Run the main_loop
         SPDLOG_INFO("Starting the SmqManager main loop.");
