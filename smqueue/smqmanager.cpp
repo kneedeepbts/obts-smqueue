@@ -59,16 +59,27 @@ namespace kneedeepbts::smqueue {
 
         // Run the main_loop
         SPDLOG_INFO("Starting the SmqManager main loop.");
+        int i = 15;
         while(!stop_main_loop) {
             //main_loop(60000);
             SPDLOG_INFO("main loop.");
             sleep(1);
+            if(i < 1) {
+                stop_main_loop = true;
+            }
+            i++;
         }
 
         // Cleanup after the main_loop
         SPDLOG_INFO("Cleaning up after the SmqManager main loop.");
         // FIXME: What makes this the "reader" loop?
         //CleaupAfterMainreaderLoop();
+
+        // Wait for the threads to end.
+        m_reader.stop();
+        //m_writer.stop();
+        reader_thread.join();
+        //writer_thread.join();
 
         save_queue_to_file();
 

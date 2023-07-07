@@ -20,6 +20,7 @@ namespace kneedeepbts::smqueue {
     }
 
     void SmqReader::stop() {
+        SPDLOG_DEBUG("Stopping reader thread.");
         m_stop_thread = true;
     }
 
@@ -37,6 +38,8 @@ namespace kneedeepbts::smqueue {
             m_tsq.pop();
             sleep(1);
         }
+
+        SPDLOG_DEBUG("Reader thread finishing.");
     }
 
     // FIXME: This whole structure is bass-ackwards.  The smq_manager should run the main loop, not the reader.
