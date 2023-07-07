@@ -31,6 +31,10 @@ namespace kneedeepbts::smqueue {
 
     void SmqReader::reader_thread() {
         SPDLOG_DEBUG("Starting the reader thread.");
+        char hostname[16] = {0};
+        size_t hostlength = 16;
+        enet_address_get_host_ip(&m_net_address, hostname, hostlength);
+        SPDLOG_DEBUG("Server Host: {}, Port: {}", hostname, m_net_address.port);
 
         m_net_server = enet_host_create(&m_net_address, m_num_connections, 1, 0, 0);
         if(m_net_server == nullptr) {
