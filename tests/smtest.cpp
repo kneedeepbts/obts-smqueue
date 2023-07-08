@@ -47,7 +47,9 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
     }
 
     // Wait before sending packet to see if the connection or the send causes the segfault.
-    sleep(3);
+    sleep(1);
+    enet_host_flush(m_client);
+    sleep(1);
 
     // Send a short message
     static const char form[] =
@@ -66,7 +68,7 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
     enet_host_flush(m_client);
     SPDLOG_INFO("Packet Sent");
 
-    int i = 15;
+    int i = 5;
     while(i > 0) {
         sleep(1);
         i--;
