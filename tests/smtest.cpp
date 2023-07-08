@@ -61,6 +61,13 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
     packet = enet_packet_create(form, strlen(form) + 1, ENET_PACKET_FLAG_UNSEQUENCED);
     enet_peer_send(m_peer, 0, packet);
     enet_host_flush(m_client);
+    SPDLOG_INFO("Packet Sent");
+
+    int i = 15;
+    while(i > 0) {
+        sleep(1);
+        i--;
+    }
 
     // Check the ack (should there be an ack or result?)
 
