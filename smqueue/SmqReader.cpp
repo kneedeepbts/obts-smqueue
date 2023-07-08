@@ -2,7 +2,7 @@
 
 #include <string>
 
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include "spdlog/spdlog.h"
 
 #include <osipparser2/osip_message.h>
@@ -86,14 +86,17 @@ namespace kneedeepbts::smqueue {
         smp.initialize(event->packet->dataLength, (char *)event->packet->data, false);
         smp.ms_to_sc = true;
 
+        SPDLOG_TRACE("Getting the IP and copying into short message.");
         enet_address_get_host_ip(&event->peer->address, hostname, hostlength);
         smp.srcaddrlen = hostlength; // Need to find the first null character
         memcpy(smp.srcaddr, hostname, hostlength);
 
+        SPDLOG_TRACE("About to validate short message.");
         uint32_t result = 0;
         //int32_t errcode = validate_short_msg(smp, true); // FIXME: Why is this needed?
         // FIXME: Can this validation be moved into the short message class?
         result = validate_msg(&smp);
+        SPDLOG_TRACE("Validation of short message complete.");
 
         if(result == 0) {
             //insert_new_message(smp); // FIXME: Bring this in to the local queue.
