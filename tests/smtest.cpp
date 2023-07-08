@@ -48,7 +48,7 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
 
     // Wait before sending packet to see if the connection or the send causes the segfault.
     sleep(1);
-    enet_host_flush(m_client);
+    enet_host_service(m_client, &event, 2000);
     sleep(1);
 
     // Send a short message
