@@ -48,11 +48,10 @@ namespace kneedeepbts::smqueue {
         close(0); // Shut off stdin in case we're in background
         open("/dev/null", O_RDONLY); // fill it with nullity
 
-        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<std::string>("udpport"));
         SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<uint16_t>("udpport"));
         SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
         SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
-        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<std::string>("registry_port"));
+        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<uint16_t>("registry_port"));
 
         // Run the reader and writer threads
         SPDLOG_INFO("Starting the reader and writer threads.");
