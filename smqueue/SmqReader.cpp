@@ -240,6 +240,7 @@ namespace kneedeepbts::smqueue {
 
         // Set the qtag from the parsed fields, if it hasn't been set yet.
         result = (smp->set_qtag());
+        return result;
     }
 
     uint32_t SmqReader::verify_ack(kneedeepbts::smqueue::ShortMsgPending *smp) {
