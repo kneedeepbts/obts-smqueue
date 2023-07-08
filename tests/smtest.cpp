@@ -46,6 +46,9 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
         SPDLOG_ERROR("Connection to {}:{} failed.", m_hostname, m_port);
     }
 
+    // Wait before sending packet to see if the connection or the send causes the segfault.
+    sleep(3);
+
     // Send a short message
     static const char form[] =
         "MESSAGE sip:1234@127.0.0.1 SIP/2.0\n"
