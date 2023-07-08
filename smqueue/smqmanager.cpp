@@ -70,7 +70,7 @@ namespace kneedeepbts::smqueue {
 
         // Run the main_loop
         SPDLOG_INFO("Starting the SmqManager main loop.");
-        int i = 15;
+        int i = 150;
         while(!stop_main_loop) {
             //main_loop(60000);
             SPDLOG_INFO("main loop.");
