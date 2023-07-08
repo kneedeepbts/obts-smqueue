@@ -53,16 +53,20 @@ namespace kneedeepbts::smqueue {
                 switch(event.type) {
                     case ENET_EVENT_TYPE_CONNECT:
                         SPDLOG_INFO("Client Connected {}:{}", event.peer->address.host, event.peer->address.port);
+                        break;
                     case ENET_EVENT_TYPE_DISCONNECT:
                         SPDLOG_INFO("Client Disconnected {}:{}", event.peer->address.host, event.peer->address.port);
+                        break;
                     case ENET_EVENT_TYPE_RECEIVE:
                         SPDLOG_TRACE("Received Packet {}:{}", event.peer->address.host, event.peer->address.port);
                         SPDLOG_TRACE("Number of bytes: {}", event.packet->dataLength);
                         process_event(&event);
                         enet_packet_destroy(event.packet);
+                        break;
                     case ENET_EVENT_TYPE_NONE:
                     default:
                         SPDLOG_TRACE("Nothing happened, loop again.");
+                        break;
                 }
             }
         }
