@@ -5,6 +5,8 @@
 #include <fstream>
 #include <utility>
 
+#include <enet/enet.h>
+
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
 #include "spdlog/spdlog.h"
 
@@ -16,6 +18,12 @@ namespace kneedeepbts::smqueue {
           m_reader(*m_config->get_as<std::string>("ip_address"), *m_config->get_as<uint16_t>("udpport")) {}
 
     void SmqManager::run() {
+        // Initialize the UDP network library
+        if(enet_initialize() != 0) {
+            SPDLOG_ERROR("Failed to initialize the UDP networking library.");
+            return; // Bail out now.
+        }
+
         // Set the recursive attribute on the pthread mutex
         int mStatus = pthread_mutexattr_init(&mutexSLAttr);
         if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_init error: {}", mStatus); }
@@ -88,6 +96,9 @@ namespace kneedeepbts::smqueue {
 
         // Free up any OSIP stuff, to make valgrind squeaky clean.
         osip_mem_release();
+
+        // Deinitialize the UDP networking library
+        atexit(enet_deinitialize);
     }
 
 

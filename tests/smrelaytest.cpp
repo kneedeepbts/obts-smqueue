@@ -22,9 +22,6 @@
 
 */
 
-
-#include "smtest.h"
-
 #include <string.h>
 #include <stdlib.h>
 
@@ -32,43 +29,47 @@
 
 // (pat 8-9-2013) Unfortunately we need a default config to eliminate link errors.
 #include <Configuration.h>
-ConfigurationTable gConfig("/etc/OpenBTS/smqueue.db","smtest");
+ConfigurationTable gConfig("/etc/OpenBTS/smqueue.db","smrelaytest");
 
 /** Submit an SMS for delivery.
  *  @return The server return code.
  */
-int sendMessage(const char *smqueueIP, int smqueuePort, const char *myIP, int myPort,
+int sendMessage(const char *smqueueIP, int smqueuePort, const char *myIP, int relayPort,
 		const char *smscCode, const char *from, const char *to,
-		const char *txtBuf)
+		const char *txtBuf, const char *contentType)
 {
-	static UDPSocket sock(myPort, smqueueIP, smqueuePort);
+//	static UDPSocket sock(myPort, smqueueIP, smqueuePort);
+	static UDPSocket relay(relayPort, smqueueIP, smqueuePort);
 
 	static const char form[] =
 		"MESSAGE sip:%s@%s SIP/2.0\n"
-		"Via: SIP/2.0/UDP %s;branch=%x\n"
+		"Via: SIP/2.0/UDP %s:%d;branch=%x\n"
 		"Max-Forwards: 2\n"
 		"From: %s <sip:%s@%s:%d>;tag=%d\n"
 		"To: sip:%s@%s\n"
 		"Call-ID: %x@%s:%d\n"
 		"CSeq: 1 MESSAGE\n"
-		"Content-Type: text/plain\n" \
+		"Content-Type: %s\n" \
 		"Content-Length: %u\n"
 		"\n%s\n";
 	static char buffer[1500];
 	snprintf(buffer, 1499, form,
 		smscCode, smqueueIP,
-		myIP, (unsigned)random(),
-		from, from, myIP, myPort, (unsigned)random(),
+		myIP, relayPort, (unsigned)random(),
+		from, from, myIP, relayPort, (unsigned)random(),
 		to, smqueueIP,
-		(unsigned)random(), myIP, myPort,
-		strlen(txtBuf), txtBuf);
-	sock.write(buffer);
+		(unsigned)random(), myIP, relayPort,
+		contentType, strlen(txtBuf), txtBuf);
 
-	int numRead = sock.read(buffer,10000);
+	printf(">>>>>>>>>>>>>>>>>>>>\n%s\n", buffer);
+
+	relay.write(buffer);
+
+	int numRead = relay.read(buffer,10000);
 	if (numRead >= 0) {
 		buffer[numRead] = '\0';
 
-		printf("%s\n", buffer);
+		printf("<<<<<<<<<<<<<<<<<<<<\n%s\n", buffer);
 	} else {
 		printf("%s\n", "Timed out");
 	}
@@ -78,23 +79,24 @@ int sendMessage(const char *smqueueIP, int smqueuePort, const char *myIP, int my
 
 int main(int argc, const char *argv[])
 {
-	if (argc == 8) {
+	if (argc == 9) {
 		const char *smqueueIP = argv[1]; //"127.0.0.1";
 		int smqueuePort = atoi(argv[2]); //5062;
 		const char *myIP = argv[3]; //"127.0.0.1";
-		int myPort = atoi(argv[4]); //5070;
+		int relayPort = atoi(argv[4]);
 		const char *smscCode = "smsc";
 		const char *from = argv[5];
 		const char *to = argv[6];
 		const char *msg = argv[7];
+		const char *contentType = argv[8];
 
-#define doTest(x,y,z) sendMessage(smqueueIP, smqueuePort, myIP, myPort, smscCode, x, y, z)
+#define doTest(x,y,z) sendMessage(smqueueIP, smqueuePort, myIP, relayPort, smscCode, x, y, z, contentType)
 	
 		//doTest("from", "to", "message");
 		doTest(from, to, msg);
 	} else {
 		printf("usage: (All fields are required)\n"
-			"smtest smqueueIP smqueuePort myIP myPort from to message\n\n");
+			"smrelaytest smqueueIP smqueuePort myIP relayPort from to message contentType\n\n");
 	}
 
 	return 1;
