@@ -119,15 +119,17 @@ namespace kneedeepbts::smqueue {
     }
 
     uint32_t SmqReader::validate_msg(ShortMsgPending * smp) {
-        int32_t result = 0;
+        uint32_t result = 0;
         //int32_t errcode = validate_short_msg(smp, true); // FIXME: Why is this needed?
         // FIXME: Can this validation be moved into the short message class?
+        SPDLOG_DEBUG("About to parse message.");
         if(!smp->parsed_is_valid) {
             if(!smp->parse()) {
                 SPDLOG_DEBUG("Failed to Parse");
                 result = 400;
             }
         }
+        SPDLOG_DEBUG("Message parsing done.");
 
         if(!smp->parsed) {
             SPDLOG_DEBUG("Parsed is null");
@@ -250,7 +252,8 @@ namespace kneedeepbts::smqueue {
         return result;
     }
 
-    uint32_t SmqReader::verify_ack(kneedeepbts::smqueue::ShortMsgPending *smp) {
+    uint32_t SmqReader::verify_ack(kneedeepbts::smqueue::ShortMsgPending * smp) {
+        SPDLOG_DEBUG("Verifying ACK");
         size_t clen = 0;
         char * endptr;
 
@@ -283,26 +286,27 @@ namespace kneedeepbts::smqueue {
         return 0;
     }
 
-    uint32_t SmqReader::verify_msg(kneedeepbts::smqueue::ShortMsgPending *smp) {
+    uint32_t SmqReader::verify_msg(kneedeepbts::smqueue::ShortMsgPending * smp) {
+        SPDLOG_DEBUG("Verifying MSG");
         char * user;
 
         if (!smp->parsed->req_uri || !smp->parsed->req_uri->scheme) {
-            LOG(DEBUG) << "No scheme or uri";
+            SPDLOG_DEBUG("No scheme or uri");
             return 400;
         }
 
         if (0 != strcmp("sip", smp->parsed->req_uri->scheme)) {
-            LOG(DEBUG) << "Not SIP scheme";
+            SPDLOG_DEBUG("Not SIP scheme");
             return 416;
         }
 
         if (!smp->check_host_port(smp->parsed->req_uri->host, smp->parsed->req_uri->port)) {
-            LOG(DEBUG) << "Host port check failed";
+            SPDLOG_DEBUG("Host port check failed");
             return 484;
         }
 
         if (!smp->parsed->sip_method) {
-            LOG(DEBUG) << "SIP method not set";
+            SPDLOG_DEBUG("SIP method not set");
             return 405;
         }
 
