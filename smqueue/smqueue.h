@@ -24,38 +24,38 @@
 #ifndef SM_QUEUE_H
 #define SM_QUEUE_H
 
-#include "SmqGlobals.h"
-#include <time.h>
-//#include <osipparser2/osip_message.h>	/* from osipparser2 */
-#include <stdlib.h>			/* for osipparser2 */
-#include <sys/time.h>			/* for osip_init */
-#include <osip2/osip.h>			/* for osip_init */
-#include <list>
-#include <map>
-#include <string>
-#include <iostream>
-#include <stdio.h>
+//#include "SmqGlobals.h"
+//#include <time.h>
+////#include <osipparser2/osip_message.h>	/* from osipparser2 */
+//#include <stdlib.h>			/* for osipparser2 */
+//#include <sys/time.h>			/* for osip_init */
+//#include <osip2/osip.h>			/* for osip_init */
+//#include <list>
+//#include <map>
+//#include <string>
+//#include <iostream>
+//#include <stdio.h>
+//
+//#include "smnet.h" // My network support
+//#include <SubscriberRegistry.h> // My home location register
+//
+//#include <Logger.h>
+//
+//#include "shortmsg.h"
+//#include "shortmsgpending.h"
+//#include "smqmanager.h"
 
-#include "smnet.h" // My network support
-#include <SubscriberRegistry.h> // My home location register
-
-#include <Logger.h>
-
-#include "shortmsg.h"
-#include "shortmsgpending.h"
-#include "smqmanager.h"
-
-void ProcessReceivedMsg();
+//void ProcessReceivedMsg();
 
 // That's awful OSIP has a CR define.
 // It clashes with our innocent L2Address::CR().
 // Don't create 2-letter #defines, ever!
-#undef CR
-#include "SMSMessages.h"
-using namespace SMS;
+//#undef CR
+//#include "SMSMessages.h"
+//using namespace SMS;
 
 
-namespace SMqueue {
+//namespace SMqueue {
 
 ///* Maximum text size of an SMS message.  */
 //#define SMS_MESSAGE_MAX_LENGTH  160
@@ -63,7 +63,7 @@ namespace SMqueue {
 
 /* strdup uses malloc, which doesn't play well with new/delete.
    The idiots who defined C++ don't provide one, so we will. */
-char *new_strdup(const char *orig);
+//char *new_strdup(const char *orig);
 
 ///*
 // * States that a message can be in, while processed.
@@ -590,7 +590,7 @@ char *new_strdup(const char *orig);
 //
 
 //}; // SMq class
-} // namespace SMqueue
+//} // namespace SMqueue
 
 //extern SMqueue::SMq smq;
 

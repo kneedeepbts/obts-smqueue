@@ -4,6 +4,7 @@
 #include <list>
 #include <string>
 
+#include <osip2/osip.h>
 #include <osipparser2/osip_message.h>
 #include <cpptoml.h>
 
@@ -360,6 +361,7 @@ namespace kneedeepbts::smqueue {
         // Bringing here from smqueue "global"
         //bool print_as_we_validate = false;
         bool osip_initialized = false;
+        osip_t * osip = nullptr;
         struct osip *osipptr = nullptr; // Ptr to struct sorta used by library
         FILE * m_cdrfile = nullptr;
         short_code_map_t short_code_map{};

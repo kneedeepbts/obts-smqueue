@@ -24,6 +24,12 @@ namespace kneedeepbts::smqueue {
             return; // Bail out now.
         }
 
+        // Initialize the OSIP library
+        if(osip_init(&osip) != 0) {
+            SPDLOG_ERROR("Failed to initialize the OSIP library.");
+            return;
+        }
+
         // Set the recursive attribute on the pthread mutex
         int mStatus = pthread_mutexattr_init(&mutexSLAttr);
         if (mStatus != 0) { SPDLOG_DEBUG("Mutex pthread_mutexattr_init error: {}", mStatus); }
