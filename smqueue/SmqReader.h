@@ -34,7 +34,7 @@ namespace kneedeepbts::smqueue {
 
         void reader_thread();
 
-        static void *SmqReaderThread(void *ptr);
+        //uint32_t queue_count();
 
     private:
         void process_event(ENetEvent * event);

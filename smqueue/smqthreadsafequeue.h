@@ -33,6 +33,10 @@ namespace kneedeepbts::smqueue {
             return m_queue.empty();
         }
 
+        uint32_t count() {
+            return m_queue.size();
+        }
+
     private:
         std::mutex m_mutex;
         std::condition_variable m_cond_var;

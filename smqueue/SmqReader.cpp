@@ -65,7 +65,7 @@ namespace kneedeepbts::smqueue {
                         break;
                     case ENET_EVENT_TYPE_NONE:
                     default:
-                        SPDLOG_TRACE("Nothing happened, loop again.");
+                        SPDLOG_TRACE("Nothing happened, loop again. Queue Count: {}", m_tsq.count());
                         break;
                 }
             }
@@ -364,4 +364,8 @@ namespace kneedeepbts::smqueue {
         }
         return 0;
     }
+
+//    uint32_t SmqReader::queue_count() {
+//        return m_tsq.count();
+//    }
 }
