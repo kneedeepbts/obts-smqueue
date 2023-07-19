@@ -18,7 +18,7 @@ namespace kneedeepbts::smqueue {
 //    }
 
     void SmqAcker::thread() {
-        SPDLOG_DEBUG("Starting the thread.");
+        SPDLOG_DEBUG("Starting the acker thread");
 
         // Initialize things
 

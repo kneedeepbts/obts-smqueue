@@ -1,5 +1,8 @@
 #include "SmqReader.h"
 
+#include <cerrno>
+#include <chrono>
+
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include "spdlog/spdlog.h"
 
@@ -35,7 +38,7 @@ namespace kneedeepbts::smqueue {
 //    }
 
     void SmqReader::thread() {
-        SPDLOG_DEBUG("Starting the reader thread.");
+        SPDLOG_DEBUG("Starting the reader thread");
 
         // Set up the network
         if(bind(m_socket, reinterpret_cast<sockaddr*>(&m_addr), sizeof(m_addr)) == SOCKET_ERROR) {
@@ -50,11 +53,16 @@ namespace kneedeepbts::smqueue {
         char message_buffer[512];
         RawMessage * msg;
         while(!m_stop_thread) {
-            // FIXME: Do we want to use "non-blocking" call here?
-            ssize_t recv_len = recvfrom(m_socket, message_buffer, sizeof(message_buffer), 0, reinterpret_cast<sockaddr*>(&client), &slen);
+            ssize_t recv_len = recvfrom(m_socket, message_buffer, sizeof(message_buffer), MSG_DONTWAIT, reinterpret_cast<sockaddr*>(&client), &slen);
             if(recv_len == SOCKET_ERROR) {
-                SPDLOG_ERROR("Error occurred during recvfrom in SmqReader");
-                m_stop_thread = true;
+                if(errno == EWOULDBLOCK) {
+                    // Nothing to receive, so sleep for a bit.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(m_timeout_ms));
+                } else {
+                    // Something bad happened, so bail out of the thread.
+                    SPDLOG_ERROR("Error occurred during recvfrom in SmqReader: {}", errno);
+                    m_stop_thread = true;
+                }
             } else {
                 // All is well, handle the event.
                 SPDLOG_TRACE("Received Packet from {}:{}", inet_ntop(AF_INET, &client.sin_addr, client_ip, INET_ADDRSTRLEN), ntohs(client.sin_port));

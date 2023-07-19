@@ -1,5 +1,8 @@
 #include "SmqWriter.h"
 
+#include <cerrno>
+#include <chrono>
+
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 #include "spdlog/spdlog.h"
 
@@ -7,7 +10,7 @@ namespace kneedeepbts::smqueue {
     SmqWriter::SmqWriter() : SmqThread(), SmqRmq(), NetSocket(SocketType::TYPE_DGRAM) {}
 
     void SmqWriter::thread() {
-        SPDLOG_DEBUG("Starting the writer thread.");
+        SPDLOG_DEBUG("Starting the writer thread");
 
         // Initialize things
 

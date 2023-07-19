@@ -139,7 +139,7 @@ namespace kneedeepbts::smqueue {
         SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<uint16_t>("registry_port"));
 
         // Run the reader and writer threads
-        SPDLOG_INFO("Starting the reader and writer threads.");
+        SPDLOG_INFO("Starting the threads.");
         // FIXME: Should these be more of an async type model?
         // FIXME: Should these threads be put into a list/vector for safe storage?
         std::thread writer_thread = m_writer.run();

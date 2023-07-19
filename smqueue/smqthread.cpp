@@ -1,6 +1,6 @@
 #include "smqthread.h"
 
-#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+#define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
 #include "spdlog/spdlog.h"
 
 namespace kneedeepbts::smqueue {
@@ -9,7 +9,7 @@ namespace kneedeepbts::smqueue {
     }
 
     void SmqThread::stop() {
-        SPDLOG_DEBUG("Stopping reader thread.");
+        SPDLOG_DEBUG("Stopping this thread");
         m_stop_thread = true;
     }
 }
