@@ -58,8 +58,7 @@ SMnet::abfuckingort()
  * Result is true if sent OK; false if not (and errno is set if false).
  */
 bool
-SMnet::send_dgram(char *buffer, size_t buffsize, char *toaddr,
-		size_t toaddrsize)
+SMnet::send_dgram(char *buffer, size_t buffsize, char *toaddr, size_t toaddrsize)
 {
 	ssize_t i;
 	int flags = MSG_DONTWAIT;

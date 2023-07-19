@@ -18,6 +18,7 @@
 
 #include "SmqReader.h"
 #include "SmqWriter.h"
+#include "smqacker.h"
 
 /* Maximum text size of an SMS message.  */
 #define SMS_MESSAGE_MAX_LENGTH  160
@@ -40,15 +41,12 @@ namespace kneedeepbts::smqueue {
         /* Destructor */
         ~SmqManager() { pthread_mutex_destroy(&sortedListMutex); }
 
-        void InitBeforeMainLoop();
+        //void InitBeforeMainLoop();
         //void CleaupAfterMainreaderLoop();
-        void InitInsideReaderLoop();
+        //void InitInsideReaderLoop();
 
         void unlockSortedList() { pthread_mutex_unlock(&sortedListMutex); }
-
         void lockSortedList() { pthread_mutex_lock(&sortedListMutex); }
-
-        void osip_mem_release();
 
         // This is the method to initialize and then run the main_loop
         void run();
@@ -93,7 +91,7 @@ namespace kneedeepbts::smqueue {
         bool to_is_deliverable(const char *username);
         bool from_is_deliverable(const char *from);
 
-        bool convert_content_type(ShortMsgPending *message, kneedeepbts::smqueue::ShortMsg::ContentType to_type);
+        //bool convert_content_type(ShortMsgPending *message, kneedeepbts::smqueue::ShortMsg::ContentType to_type);
 
         /* Convert a short_msg to a given content type */
         //void convert_message(short_msg_pending *qmsg, short_msg::ContentType toType);
@@ -204,7 +202,7 @@ namespace kneedeepbts::smqueue {
             // Low timeout will cause this msg to be at front of queue.
             unlockSortedList();
             debug_dump(); //svgfix
-            m_writer.ProcessReceivedMsg();
+            //m_writer.ProcessReceivedMsg(); // FIXME: Create a RawMessage and send to the writer?
         }
 
         // This version lets the initial state be set.
@@ -217,7 +215,7 @@ namespace kneedeepbts::smqueue {
             // Low timeout will cause this msg to be at front of queue.
             unlockSortedList();
             debug_dump(); //svgfix
-            m_writer.ProcessReceivedMsg();
+            //m_writer.ProcessReceivedMsg(); // FIXME: Create a RawMessage and send to the writer?
         }
         // This version lets the state and timeout be set.
         void insert_new_message(short_msg_p_list &smp, enum sm_state s, time_t t) {
@@ -231,7 +229,7 @@ namespace kneedeepbts::smqueue {
             QueuedMsgHdrs* pMsg = new ProcessIncommingMsg();
             SimpleWrapper* sWrap = new SimpleWrapper(pMsg);
             //SendWriterMsg(sWrap);
-            m_writer.getqueHan()->SmqSendMessage(sWrap);
+            //m_writer.getqueHan()->SmqSendMessage(sWrap); // FIXME: Create a RawMessage and send to the writer?
         }
 
         /* Debug dump of the queue and the SMq class in general. */
@@ -316,7 +314,8 @@ namespace kneedeepbts::smqueue {
            from the message's contents.   Result is 0 for valid, or
            SIP response error code (e.g. 405).  */
         // FIXME: This causes a circular dependency between SmqManager and this class
-        int validate_short_msg(ShortMsgPending *smp, bool should_early_check);
+        //int validate_short_msg(ShortMsgPending *smp, bool should_early_check);
+
     private:
         // Override operator= so -Weffc++ doesn't complain
         // *DISABLE* assignments by making the = operation private.
@@ -352,7 +351,7 @@ namespace kneedeepbts::smqueue {
         bool have_register_call_id = false; // FIXME: Trigger off "" value of call_id?
 
         /* Set this to true when you want main loop to stop.  */
-        bool stop_main_loop = false;
+        bool m_stop_main_loop = false;
 
         /* Set this to true when you want the program to re-exec itself
            instead of terminating after the main loop stops.  */
@@ -360,9 +359,9 @@ namespace kneedeepbts::smqueue {
 
         // Bringing here from smqueue "global"
         //bool print_as_we_validate = false;
-        bool osip_initialized = false;
+        //bool osip_initialized = false;
         osip_t * osip = nullptr;
-        struct osip *osipptr = nullptr; // Ptr to struct sorta used by library
+        //struct osip *osipptr = nullptr; // Ptr to struct sorta used by library
         FILE * m_cdrfile = nullptr;
         short_code_map_t short_code_map{};
 
@@ -374,6 +373,7 @@ namespace kneedeepbts::smqueue {
 
         SmqReader m_reader;
         SmqWriter m_writer{};
+        SmqAcker m_acker;
     };
 }
 

@@ -5,7 +5,7 @@
 #include <fstream>
 #include <utility>
 
-#include <enet/enet.h>
+//#include <enet/enet.h>
 
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
 #include "spdlog/spdlog.h"
@@ -15,14 +15,16 @@
 namespace kneedeepbts::smqueue {
     SmqManager::SmqManager(std::shared_ptr<cpptoml::table> config)
         : m_config(config),
-          m_reader(*m_config->get_as<std::string>("ip_address"), *m_config->get_as<uint16_t>("udpport")) {}
+          m_reader(*m_config->get_as<std::string>("ip_address"), *m_config->get_as<uint16_t>("udpport")),
+          m_writer(),
+          m_acker(&m_reader, &m_writer) {}
 
     void SmqManager::run() {
         // Initialize the UDP network library
-        if(enet_initialize() != 0) {
-            SPDLOG_ERROR("Failed to initialize the UDP networking library.");
-            return; // Bail out now.
-        }
+//        if(enet_initialize() != 0) {
+//            SPDLOG_ERROR("Failed to initialize the UDP networking library.");
+//            return; // Bail out now.
+//        }
 
         // Initialize the OSIP library
         if(osip_init(&osip) != 0) {
@@ -43,77 +45,11 @@ namespace kneedeepbts::smqueue {
         my_hlr.init();
 
         // FIXME: What makes this the "reader" loop?
-        InitBeforeMainLoop();
-
-        // FIXME: What makes this the "reader" loop?
-        //InitInsideReaderLoop();
-        std::string content_type = *m_config->get_as<std::string>("globalrelay_type");
-        if (content_type == "text/plain") {
-            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
-        } else if (content_type == "") {
-            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
-        } else {
-            SPDLOG_ERROR("Bad Global Relay ContentType: {}", content_type);
-            // FIMXE: Error out here.
-        }
-
-        // FIXME: This should probably be handled in the main function in smqueue.cpp
-        // system() calls in back grounded jobs hang if stdin is still open on tty.  So, close it.
-        close(0); // Shut off stdin in case we're in background
-        open("/dev/null", O_RDONLY); // fill it with nullity
-
-        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<uint16_t>("udpport"));
-        SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
-        SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
-        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<uint16_t>("registry_port"));
-
-        // Run the reader and writer threads
-        SPDLOG_INFO("Starting the reader and writer threads.");
-        // FIXME: Should these be more of an async type model?
-        // FIXME: Should these threads be put into a list/vector for safe storage?
-        std::thread reader_thread = m_reader.run();
-        //m_writer.run();
-
-        // Run the main_loop
-        SPDLOG_INFO("Starting the SmqManager main loop.");
-        int i = 150;
-        while(!stop_main_loop) {
-            //main_loop(60000);
-            SPDLOG_INFO("main loop.");
-            sleep(1);
-            if(i < 1) {
-                stop_main_loop = true;
-            }
-            i--; // derp.
-        }
-
-        // Cleanup after the main_loop
-        SPDLOG_INFO("Cleaning up after the SmqManager main loop.");
-        // FIXME: What makes this the "reader" loop?
-        //CleaupAfterMainreaderLoop();
-
-        // Wait for the threads to end.
-        m_reader.stop();
-        //m_writer.stop();
-        reader_thread.join();
-        //writer_thread.join();
-
-        save_queue_to_file();
-
-        // Free up any OSIP stuff, to make valgrind squeaky clean.
-        osip_mem_release();
-
-        // Deinitialize the UDP networking library
-        atexit(enet_deinitialize);
-    }
-
-
-
-    void SmqManager::InitBeforeMainLoop() {
+        //InitBeforeMainLoop();
         //m_NodeManager.start(45063);
 
         //please_re_exec = false;
-        stop_main_loop = false;
+        m_stop_main_loop = false;
         //reexec_smqueue = false;
 
         // Open the CDR file for appending.
@@ -146,14 +82,14 @@ namespace kneedeepbts::smqueue {
         //LOG(DEBUG) << "Timeout from 8 to 11 " << *SMqueue::timeouts[REQUEST_MSG_DELIVERY][REQUEST_DESTINATION_SIPURL];
         //LOG(DEBUG) << "Timeout from 11 to 8 " << *SMqueue::timeouts[REQUEST_DESTINATION_SIPURL][REQUEST_MSG_DELIVERY];
 
-
-        // Port number that we (smqueue) listen on.
-        //if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
-        if (my_network.listen_on_port(*m_config->get_as<std::string>("port"))) {
-            SPDLOG_INFO("Got VALID port for smqueue to listen on");
-        } else {
-            SPDLOG_ERROR("Failed to get port for smqueue to listen on");
-        }
+// Networking has been moving into the reader and writer threads/classes.
+//        // Port number that we (smqueue) listen on.
+//        //if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
+//        if (my_network.listen_on_port(*m_config->get_as<std::string>("port"))) {
+//            SPDLOG_INFO("Got VALID port for smqueue to listen on");
+//        } else {
+//            SPDLOG_ERROR("Failed to get port for smqueue to listen on");
+//        }
 
         // Restore message queue
 //        savefile = gConfig.getStr("savefile").c_str();
@@ -163,21 +99,156 @@ namespace kneedeepbts::smqueue {
 //        }
         read_queue_from_file();
 
-        // Set up Posix message queue limit
-        // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
-        FILE * gTempFile = nullptr;
-        int xTemp;
-        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","r");
-        if (!gTempFile) {
-            SPDLOG_WARN("Could not open '/proc/sys/fs/mqueue/msg_max', errno ({}) {}", errno, strerror(errno));
-//        } else {
-//            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
-//            if (xTemp == 0){
-//                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-//            }
+// Not using mqueue anymore.  Keeping the queue in the application memory.
+//        // Set up Posix message queue limit
+//        // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
+//        FILE * gTempFile = nullptr;
+//        int xTemp;
+//        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","r");
+//        if (!gTempFile) {
+//            SPDLOG_WARN("Could not open '/proc/sys/fs/mqueue/msg_max', errno ({}) {}", errno, strerror(errno));
+////        } else {
+////            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
+////            if (xTemp == 0){
+////                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
+////            }
+//        }
+//        fclose(gTempFile);
+
+        // FIXME: What makes this the "reader" loop?
+        //InitInsideReaderLoop();
+        std::string content_type = *m_config->get_as<std::string>("globalrelay_type");
+        if (content_type == "text/plain") {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::TEXT_PLAIN;
+        } else if (content_type.empty()) {
+            global_relay_contenttype = kneedeepbts::smqueue::ShortMsg::VND_3GPP_SMS;
+        } else {
+            SPDLOG_ERROR("Bad Global Relay ContentType: {}", content_type);
+            // FIMXE: Error out here.
         }
-        fclose(gTempFile);
+
+        // FIXME: This should probably be handled in the main function in smqueue.cpp
+        // system() calls in back grounded jobs hang if stdin is still open on tty.  So, close it.
+        close(0); // Shut off stdin in case we're in background
+        open("/dev/null", O_RDONLY); // fill it with nullity
+
+        SPDLOG_INFO("SIP Port UDP: {}", *m_config->get_as<uint16_t>("udpport"));
+        SPDLOG_INFO("SIP IP: {}", *m_config->get_as<std::string>("ip_address"));
+        SPDLOG_INFO("HLR registry host: {}", *m_config->get_as<std::string>("registry_host"));
+        SPDLOG_INFO("HLR registry port: {}", *m_config->get_as<uint16_t>("registry_port"));
+
+        // Run the reader and writer threads
+        SPDLOG_INFO("Starting the reader and writer threads.");
+        // FIXME: Should these be more of an async type model?
+        // FIXME: Should these threads be put into a list/vector for safe storage?
+        std::thread writer_thread = m_writer.run();
+        std::thread reader_thread = m_reader.run();
+        std::thread acker_thread = m_acker.run();
+
+        // Run the main_loop
+        SPDLOG_INFO("Starting the SmqManager main loop.");
+        int i = 150;
+        while(!m_stop_main_loop) {
+            //main_loop(60000);
+            SPDLOG_INFO("main loop.");
+            sleep(1);
+            if(i < 1) {
+                m_stop_main_loop = true;
+            }
+            i--; // derp.
+        }
+
+        // Cleanup after the main_loop
+        SPDLOG_INFO("Cleaning up after the SmqManager main loop.");
+
+        // Wait for the threads to end.
+        m_reader.stop();
+        m_writer.stop();
+        m_acker.stop();
+        reader_thread.join();
+        writer_thread.join();
+        acker_thread.join();
+
+        save_queue_to_file();
+
+        // Free up any OSIP stuff, to make valgrind squeaky clean.
+        osip_release(osip);
+
+        // Deinitialize the UDP networking library
+//        atexit(enet_deinitialize);
     }
+
+
+
+//    void SmqManager::InitBeforeMainLoop() {
+//        //m_NodeManager.start(45063);
+//
+//        //please_re_exec = false;
+//        stop_main_loop = false;
+//        //reexec_smqueue = false;
+//
+//        // Open the CDR file for appending.
+//        std::string CDRFilePath = *m_config->get_as<std::string>("cdrfile");
+//        if (CDRFilePath.length()) {
+//            m_cdrfile = fopen(CDRFilePath.c_str(),"a");
+//            if (!m_cdrfile) {
+//                SPDLOG_ERROR("CDR file at {} could not be created or opened! errno ({}) {}", CDRFilePath.c_str(), errno, strerror(errno));
+//            }
+//        }
+//
+//        // Set up short-code commands users can type
+//        // FIXME: Clean these up and re-apply.
+//        //init_smcommands(&short_code_map);
+//
+//        // NOTE: Not going to worry about setting timeouts from the configuration file right now.
+////        if (gConfig.defines("SIP.Timeout.MessageResend")) {
+////            int int1 = gConfig.getNum("SIP.Timeout.MessageResend");
+////            LOG(DEBUG) << "Set SIP.Timeout.MessageResend value " <<  int1;
+////            // timeouts_REQUEST_MSG_DELIVERY[REQUEST_DESTINATION_SIPURL] = int1;  // svgfix
+////        }
+////
+////        if (gConfig.defines("SIP.Timeout.MessageBounce")) {
+////            int int2 = gConfig.getNum("SIP.Timeout.MessageBounce");
+////            LOG(DEBUG) << "Set SIP.Timeout.MessageBounce value " <<  int2;
+////            timeouts_REQUEST_DESTINATION_IMSI[DELETE_ME_STATE] = int2;
+////        }
+//
+//        //LOG(DEBUG) << "REQUEST_DESTINATION_SIPURL value " << REQUEST_DESTINATION_SIPURL;
+//        //LOG(DEBUG) << "Timeout from 8 to 11 " << *SMqueue::timeouts[REQUEST_MSG_DELIVERY][REQUEST_DESTINATION_SIPURL];
+//        //LOG(DEBUG) << "Timeout from 11 to 8 " << *SMqueue::timeouts[REQUEST_DESTINATION_SIPURL][REQUEST_MSG_DELIVERY];
+//
+//
+//        // Port number that we (smqueue) listen on.
+//        //if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
+//        if (my_network.listen_on_port(*m_config->get_as<std::string>("port"))) {
+//            SPDLOG_INFO("Got VALID port for smqueue to listen on");
+//        } else {
+//            SPDLOG_ERROR("Failed to get port for smqueue to listen on");
+//        }
+//
+//        // Restore message queue
+////        savefile = gConfig.getStr("savefile").c_str();
+////        // Load queue on start up
+////        if (!read_queue_from_file(savefile)) {  // Load queue file on startup
+////            LOG(WARNING) << "Failed to read queue on startup from file " << savefile;
+////        }
+//        read_queue_from_file();
+//
+//        // Set up Posix message queue limit
+//        // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
+//        FILE * gTempFile = nullptr;
+//        int xTemp;
+//        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","r");
+//        if (!gTempFile) {
+//            SPDLOG_WARN("Could not open '/proc/sys/fs/mqueue/msg_max', errno ({}) {}", errno, strerror(errno));
+////        } else {
+////            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
+////            if (xTemp == 0){
+////                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
+////            }
+//        }
+//        fclose(gTempFile);
+//    }
 
 
 
@@ -192,15 +263,6 @@ namespace kneedeepbts::smqueue {
 //        }
 
         msg->set_state(msg->state, msg->msgettime() + timeout);
-    }
-
-    /* Release memory from osip library */
-    void SmqManager::osip_mem_release() {
-        if (osip_initialized) {
-            osip_release (osipptr);
-            osipptr = NULL;
-            osip_initialized = false;
-        }
     }
 
     /*
@@ -1091,12 +1153,12 @@ namespace kneedeepbts::smqueue {
 
             case SCA_EXEC_SMQUEUE:
                 //reexec_smqueue = true;
-                stop_main_loop = true;
+                m_stop_main_loop = true;
                 next_state = DELETE_ME_STATE;
                 return true;
 
             case SCA_QUIT_SMQUEUE:
-                stop_main_loop = true;
+                m_stop_main_loop = true;
                 next_state = DELETE_ME_STATE;
                 return true;
 
@@ -1291,17 +1353,17 @@ namespace kneedeepbts::smqueue {
         return isDeliverable;
     }
 
-    /* Requirement: parse() is called before calling this */
-    bool SmqManager::convert_content_type(ShortMsgPending *message, ShortMsg::ContentType to_type) {
-        LOG(DEBUG) << "Converting content type from " << message->content_type << " to " << to_type;
-
-        /*if ((to_type == short_msg::TEXT_PLAIN && message->content_type == short_msg::VND_3GPP_SMS) ||
-            (to_type == short_msg::VND_3GPP_SMS && message->content_type == short_msg::TEXT_PLAIN)) {
-            message->convert_message(to_type);
-        }*/
-        message->convert_message(to_type);
-        return true;
-    }
+//    /* Requirement: parse() is called before calling this */
+//    bool SmqManager::convert_content_type(ShortMsgPending *message, ShortMsg::ContentType to_type) {
+//        LOG(DEBUG) << "Converting content type from " << message->content_type << " to " << to_type;
+//
+//        /*if ((to_type == short_msg::TEXT_PLAIN && message->content_type == short_msg::VND_3GPP_SMS) ||
+//            (to_type == short_msg::VND_3GPP_SMS && message->content_type == short_msg::TEXT_PLAIN)) {
+//            message->convert_message(to_type);
+//        }*/
+//        message->convert_message(to_type);
+//        return true;
+//    }
 
     /*
      * Change the Request-URI's/phone number to a valid IMSI.
@@ -1392,7 +1454,8 @@ namespace kneedeepbts::smqueue {
                         qmsg->parsed->from->url->username =
                                 osip_strdup (newfrom);
                     }
-                    convert_content_type(qmsg, global_relay_contenttype);
+                    //convert_content_type(qmsg, global_relay_contenttype);
+                    qmsg->convert_message(global_relay_contenttype);
                     // TODO do cost checks here for out-of-network, probably instead of in smsc shortcode or INITIAL_STATE
                     return REQUEST_DESTINATION_SIPURL;
                 }
@@ -1445,92 +1508,85 @@ namespace kneedeepbts::smqueue {
      * re-sends will use the same Call-ID, but re-locate's (looking up the
      * recipient's location again) will use a new one.
      */
-    /*
-     * Helper function because C++ is fucked about types.
-     * and the osip library doesn't keep its types straight.
-     */
-    int osip_via_clone2 (void *via, void **dest) {
-        return osip_via_clone ((const osip_via_t *)via, (osip_via_t **)dest);
-    }
 
-
-    /*
-     * After we received a datagram, send a SIP response message
-     * telling the sender what we did with it.  (Unless the datagram we
-     * received was already a SIP response message...)
-     * svgfix return error on failure
-     * Called in writer thread
-     * Calls my_network.send_dgram
-     */
-    void SmqManager::respond_sip_ack(int errcode, ShortMsgPending *smp, char *netaddr, size_t netaddrlen) {
-        string phrase;
-        ShortMsg response;
-        bool okay;
-
-        LOG(DEBUG) << "Send SIP ACK message";
-
-        if (!smp->parse()) {
-            LOG(DEBUG) << "Short message parse failed";
-            return;		// Don't ack invalid SIP messages
-        }
-
-        LOG(DEBUG) << "Short message parse returned success";
-        if (MSG_IS_RESPONSE(smp->parsed)) {
-            LOG(DEBUG) << "Ignore response message";
-            return;		// Don't ack a response message, or we loop!
-        }
-        osip_message_init(&response.parsed);
-        response.parsed_is_valid = true;
-
-        // Copy over the CSeq, From, To, Call-ID, Via, etc.
-        osip_to_clone(smp->parsed->to,     &response.parsed->to);
-        osip_from_clone(smp->parsed->from, &response.parsed->from);
-        osip_cseq_clone(smp->parsed->cseq, &response.parsed->cseq);
-        osip_call_id_clone(smp->parsed->call_id, &response.parsed->call_id);
-        osip_list_clone(&smp->parsed->vias, &response.parsed->vias,
-                        &osip_via_clone2);
-
-        //don't add a new via header to a response! -kurtis
-        //RFC 3261 8.2.6.2
-
-        // Make a nice message.
-        switch (errcode) {
-            case 100:	phrase="Trying..."; break;
-            case 200:	phrase="Okay!"; break;
-            case 202:	phrase="Queued"; break;
-            case 400:	phrase="Bad Request"; break;
-            case 401:	phrase="Unauthorized"; break;
-            case 403:	phrase="Forbidden - first register, by texting your 10-digit phone number to 101."; break;
-            case 404:	phrase="Phone Number Not Registered"; break;  // Not Found
-            case 405:	phrase="Method Not Allowed";
-                osip_message_set_allow(response.parsed, "MESSAGE");
-                break;
-            case 413:	phrase="Message Body Size Error"; break;
-            case 415:	phrase="Unsupported Content Type";
-                osip_message_set_accept(response.parsed, "text/plain, application/vnd.3gpp.sms");
-                break;
-            case 416:	phrase="Unsupported URI scheme (not SIP)"; break;
-            case 480:	phrase="Recipient Temporarily Unavailable"; break;
-            case 484:	phrase="Address Incomplete"; break;
-            default:	phrase="Error Message Table Needs Updating"; break;
-        }
-
-        osip_message_set_status_code (response.parsed, errcode);
-        osip_message_set_reason_phrase (response.parsed,
-                                        osip_strdup((char *)phrase.c_str()));
-
-        // We've altered the text and the parsed version controls.
-        response.parsed_was_changed();
-
-        // Now turn it into a datagram and hustle it home.
-        response.make_text_valid();
-        LOG(INFO) << "Responding with \"" << errcode << " " << phrase << "\".";
-
-        okay = my_network.send_dgram(response.text, strlen(response.text),
-                                     netaddr, netaddrlen);
-        if (!okay)
-            LOG(ERR) << "send_dgram had trouble sending the response err " << okay << " size " << strlen(response.text);
-    }
+//
+//    /*
+//     * After we received a datagram, send a SIP response message
+//     * telling the sender what we did with it.  (Unless the datagram we
+//     * received was already a SIP response message...)
+//     * svgfix return error on failure
+//     * Called in writer thread
+//     * Calls my_network.send_dgram
+//     */
+//    void SmqManager::respond_sip_ack(int errcode, ShortMsgPending *smp, char *netaddr, size_t netaddrlen) {
+//        string phrase;
+//        ShortMsg response;
+//        bool okay;
+//
+//        LOG(DEBUG) << "Send SIP ACK message";
+//
+//        if (!smp->parse()) {
+//            LOG(DEBUG) << "Short message parse failed";
+//            return;		// Don't ack invalid SIP messages
+//        }
+//
+//        LOG(DEBUG) << "Short message parse returned success";
+//        if (MSG_IS_RESPONSE(smp->parsed)) {
+//            LOG(DEBUG) << "Ignore response message";
+//            return;		// Don't ack a response message, or we loop!
+//        }
+//        osip_message_init(&response.parsed);
+//        response.parsed_is_valid = true;
+//
+//        // Copy over the CSeq, From, To, Call-ID, Via, etc.
+//        osip_to_clone(smp->parsed->to,     &response.parsed->to);
+//        osip_from_clone(smp->parsed->from, &response.parsed->from);
+//        osip_cseq_clone(smp->parsed->cseq, &response.parsed->cseq);
+//        osip_call_id_clone(smp->parsed->call_id, &response.parsed->call_id);
+//        osip_list_clone(&smp->parsed->vias, &response.parsed->vias,
+//                        &osip_via_clone2);
+//
+//        //don't add a new via header to a response! -kurtis
+//        //RFC 3261 8.2.6.2
+//
+//        // Make a nice message.
+//        switch (errcode) {
+//            case 100:	phrase="Trying..."; break;
+//            case 200:	phrase="Okay!"; break;
+//            case 202:	phrase="Queued"; break;
+//            case 400:	phrase="Bad Request"; break;
+//            case 401:	phrase="Unauthorized"; break;
+//            case 403:	phrase="Forbidden - first register, by texting your 10-digit phone number to 101."; break;
+//            case 404:	phrase="Phone Number Not Registered"; break;  // Not Found
+//            case 405:	phrase="Method Not Allowed";
+//                osip_message_set_allow(response.parsed, "MESSAGE");
+//                break;
+//            case 413:	phrase="Message Body Size Error"; break;
+//            case 415:	phrase="Unsupported Content Type";
+//                osip_message_set_accept(response.parsed, "text/plain, application/vnd.3gpp.sms");
+//                break;
+//            case 416:	phrase="Unsupported URI scheme (not SIP)"; break;
+//            case 480:	phrase="Recipient Temporarily Unavailable"; break;
+//            case 484:	phrase="Address Incomplete"; break;
+//            default:	phrase="Error Message Table Needs Updating"; break;
+//        }
+//
+//        osip_message_set_status_code (response.parsed, errcode);
+//        osip_message_set_reason_phrase (response.parsed,
+//                                        osip_strdup((char *)phrase.c_str()));
+//
+//        // We've altered the text and the parsed version controls.
+//        response.parsed_was_changed();
+//
+//        // Now turn it into a datagram and hustle it home.
+//        response.make_text_valid();
+//        LOG(INFO) << "Responding with \"" << errcode << " " << phrase << "\".";
+//
+//        okay = my_network.send_dgram(response.text, strlen(response.text),
+//                                     netaddr, netaddrlen);
+//        if (!okay)
+//            LOG(ERR) << "send_dgram had trouble sending the response err " << okay << " size " << strlen(response.text);
+//    }
 
     //
     // The main loop that listens for incoming datagrams, handles them
@@ -1561,7 +1617,8 @@ namespace kneedeepbts::smqueue {
             // We have a phone number.  It needs translation.
             newport = strdup(global_relay_port.c_str());
             newhost = strdup(global_relay_host.c_str());
-            convert_content_type(qmsg, global_relay_contenttype);
+            //convert_content_type(qmsg, global_relay_contenttype);
+            qmsg->convert_message(global_relay_contenttype);
             //qmsg->from_relay = true;
         } else {
             /* imsi is an IMSI at this point.  */
@@ -1663,110 +1720,117 @@ namespace kneedeepbts::smqueue {
         return REQUEST_MSG_DELIVERY;
     }
 
-    /*
-     * The main loop get datagram from the network an put them into the queue for processing
-     *
-     */
+    // FIXME: Need a new main_loop that pulls messages from the reader/acker,
+    //        processes the message, then sends the result to the writer.
     void SmqManager::main_loop(int msTMO) {
-        int len;	// MUST be signed -- not size_t!
-        // else we can't see -1 for errors...
-        int timeout;
-        short_msg_p_list *smpl;
-        ShortMsgPending *smp;
-        char buffer[5000];
-        //short_msg_p_list::iterator qmsg;
-        //time_t now;
-        int errcode;
-
-        SPDLOG_DEBUG("Start SMq::main_loop (get SIP messages tmo: {})", msTMO);
-
-        // No message at this point
-        // READ
-        // Read an entry from the network
-        // This could wait a very long time for a message
-        len = my_network.get_next_dgram((char *) buffer, (int) sizeof(buffer), msTMO);
-
-        if (len < 0) {
-            // Error.
-            SPDLOG_DEBUG("Error from get_next_dgram: {}", strerror(errno));
-            // Just continue...
-            return;
-        } else if (len == 0) {
-            // Timeout.  Just push things along.
-            SPDLOG_DEBUG("Timeout wait for datagram");
-            // FIXME: Is this the correct place for this?
-            //        Or should it be on a separate time thread?
-            process_timeout();
-            return;
-        } else {
-            SPDLOG_DEBUG("Got incoming datagram length: {}", len);
-            // We got a datagram.  Dump it into the queue, copying it.
-            //
-            // Here we do a bit of tricky memory allocation.  Rather
-            // than make a short_msg_pending and then have to COPY it
-            // into a short_msg_p_list (including malloc-ing all the
-            // possible pointed-to stuff and then freeing all the original
-            // strings and things), we make a short_msg_p_list
-            // and create in it a single default element.  Then we fill
-            // in that element as our new short_msg_pending.  This lets
-            // us (soon) link it into the main message queue list,
-            // without ever copying it.
-            //
-            // HOWEVER!  The implementation of std::list in GNU C++
-            // (ver. 4.3.3) has a bug: it does not PERMIT a class to be
-            // made into
-            // a list UNLESS it allows copy-construction of its instances.
-            // You get an extremely inscrutable error message deep
-            // in the templated bowels of stl_list.h , referencing
-            // the next non-comment line of this file.
-            // THUS, we can't check at compile time to prevent the
-            // making of copies of short_msg_pending's -- instead, we
-            // have to do that check at runtime (allowing the default
-            // newly-initialized one to be copied, but aborting with
-            // any depth of stuff in it).
-
-            smpl = new short_msg_p_list(1);
-            smp = &*smpl->begin();	// Here's our short_msg_pending!
-            smp->initialize (len, buffer, false);  // Just makes a copy
-            smp->ms_to_sc = true;
-            //LOG(DEBUG) << "Before insert new message smpl size " << smpl->size();
-
-            if (my_network.recvaddrlen <= sizeof (smp->srcaddr)) {
-                smp->srcaddrlen = my_network.recvaddrlen;
-                memcpy(smp->srcaddr, my_network.src_addr,
-                       my_network.recvaddrlen);
-            }
-
-            //errcode = smp->validate_short_msg(this, true);
-            errcode = 0; //validate_short_msg(smp, true);
-            if (errcode == 0) {
-                // Message good
-                if (MSG_IS_REQUEST(smp->parsed)) {
-                    SPDLOG_INFO("Got SMS rqst qtag '{}' from {} for {}", smp->qtag, smp->parsed->from->url->username, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
-                } else {
-                    SPDLOG_INFO("Got SMS {} Response qtag '{}' for {}", smp->parsed->status_code, smp->qtag, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
-                }
-
-                // **********************************************************************
-                // ****************** Insert a message in the queue *********************
-                insert_new_message(*smpl); // Reader thread main_loop
-                errcode = 202;
-                // It's OK to reference "smp" here, whether it's in the
-                // smpl list, or has been moved into the main time_sorted_list.
-                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // Send respond_sip_ack message to writer thread
-            } else {
-                // Message is bad not inserted in queue
-                SPDLOG_WARN("Received bad message, error: {}", errcode);
-                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // SVG This might need to be removed for failed messages  Investigate
-                // Don't log message data it's invalid and should not be accessed
-            }
-
-            // We won't leak memory if we didn't queue it up, since
-            // the delete of smpl will delete anything still
-            // in its list.
-            delete smpl;  // List entry that got added
-        } // got datagram
+        // ??
+        sleep(1);
     }
+
+//    /*
+//     * The main loop get datagram from the network an put them into the queue for processing
+//     *
+//     */
+//    void SmqManager::main_loop(int msTMO) {
+//        int len;	// MUST be signed -- not size_t!
+//        // else we can't see -1 for errors...
+//        int timeout;
+//        short_msg_p_list *smpl;
+//        ShortMsgPending *smp;
+//        char buffer[5000];
+//        //short_msg_p_list::iterator qmsg;
+//        //time_t now;
+//        int errcode;
+//
+//        SPDLOG_DEBUG("Start SMq::main_loop (get SIP messages tmo: {})", msTMO);
+//
+//        // No message at this point
+//        // READ
+//        // Read an entry from the network
+//        // This could wait a very long time for a message
+//        len = my_network.get_next_dgram((char *) buffer, (int) sizeof(buffer), msTMO);
+//
+//        if (len < 0) {
+//            // Error.
+//            SPDLOG_DEBUG("Error from get_next_dgram: {}", strerror(errno));
+//            // Just continue...
+//            return;
+//        } else if (len == 0) {
+//            // Timeout.  Just push things along.
+//            SPDLOG_DEBUG("Timeout wait for datagram");
+//            // FIXME: Is this the correct place for this?
+//            //        Or should it be on a separate time thread?
+//            process_timeout();
+//            return;
+//        } else {
+//            SPDLOG_DEBUG("Got incoming datagram length: {}", len);
+//            // We got a datagram.  Dump it into the queue, copying it.
+//            //
+//            // Here we do a bit of tricky memory allocation.  Rather
+//            // than make a short_msg_pending and then have to COPY it
+//            // into a short_msg_p_list (including malloc-ing all the
+//            // possible pointed-to stuff and then freeing all the original
+//            // strings and things), we make a short_msg_p_list
+//            // and create in it a single default element.  Then we fill
+//            // in that element as our new short_msg_pending.  This lets
+//            // us (soon) link it into the main message queue list,
+//            // without ever copying it.
+//            //
+//            // HOWEVER!  The implementation of std::list in GNU C++
+//            // (ver. 4.3.3) has a bug: it does not PERMIT a class to be
+//            // made into
+//            // a list UNLESS it allows copy-construction of its instances.
+//            // You get an extremely inscrutable error message deep
+//            // in the templated bowels of stl_list.h , referencing
+//            // the next non-comment line of this file.
+//            // THUS, we can't check at compile time to prevent the
+//            // making of copies of short_msg_pending's -- instead, we
+//            // have to do that check at runtime (allowing the default
+//            // newly-initialized one to be copied, but aborting with
+//            // any depth of stuff in it).
+//
+//            smpl = new short_msg_p_list(1);
+//            smp = &*smpl->begin();	// Here's our short_msg_pending!
+//            smp->initialize (len, buffer, false);  // Just makes a copy
+//            smp->ms_to_sc = true;
+//            //LOG(DEBUG) << "Before insert new message smpl size " << smpl->size();
+//
+//            if (my_network.recvaddrlen <= sizeof (smp->srcaddr)) {
+//                smp->srcaddrlen = my_network.recvaddrlen;
+//                memcpy(smp->srcaddr, my_network.src_addr,
+//                       my_network.recvaddrlen);
+//            }
+//
+//            //errcode = smp->validate_short_msg(this, true);
+//            errcode = 0; //validate_short_msg(smp, true);
+//            if (errcode == 0) {
+//                // Message good
+//                if (MSG_IS_REQUEST(smp->parsed)) {
+//                    SPDLOG_INFO("Got SMS rqst qtag '{}' from {} for {}", smp->qtag, smp->parsed->from->url->username, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
+//                } else {
+//                    SPDLOG_INFO("Got SMS {} Response qtag '{}' for {}", smp->parsed->status_code, smp->qtag, (smp->parsed->req_uri ? smp->parsed->req_uri->username : ""));
+//                }
+//
+//                // **********************************************************************
+//                // ****************** Insert a message in the queue *********************
+//                insert_new_message(*smpl); // Reader thread main_loop
+//                errcode = 202;
+//                // It's OK to reference "smp" here, whether it's in the
+//                // smpl list, or has been moved into the main time_sorted_list.
+//                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // Send respond_sip_ack message to writer thread
+//            } else {
+//                // Message is bad not inserted in queue
+//                SPDLOG_WARN("Received bad message, error: {}", errcode);
+//                m_writer.queue_respond_sip_ack(errcode, smp, smp->srcaddr, smp->srcaddrlen); // SVG This might need to be removed for failed messages  Investigate
+//                // Don't log message data it's invalid and should not be accessed
+//            }
+//
+//            // We won't leak memory if we didn't queue it up, since
+//            // the delete of smpl will delete anything still
+//            // in its list.
+//            delete smpl;  // List entry that got added
+//        } // got datagram
+//    }
 
 
     /* Debug dump of SMq and mainly the queue. */

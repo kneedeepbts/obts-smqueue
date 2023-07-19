@@ -5,11 +5,15 @@
 #include <string>
 #include <thread>
 
-#include <enet/enet.h>
+//#include <enet/enet.h>
+//#include <simple_cpp_sockets.h>
+#include "smqthread.h"
+#include "smqrmq.h"
+#include "netsocket.h"
 
 //#include "SmqMessageHandler.h"
-
-#include "QueuedMsgHdrs.h"
+//#include "QueuedMsgHdrs.h"
+#include "rawmessage.h"
 #include "smqthreadsafequeue.h"
 
 /* It appears as though the SmqReader thread was originally used to pull packets
@@ -25,33 +29,40 @@
  * thread, which will process them and route the messages.
  */
 namespace kneedeepbts::smqueue {
-    class SmqReader {
+    class SmqReader : public SmqThread, public SmqRmq, public NetSocket {
     public:
-        SmqReader(std::string listen_address, uint16_t listen_port);
+        //SmqReader(std::string listen_address, uint16_t listen_port) : m_local_address(listen_address), m_local_port(listen_port) {}
+        explicit SmqReader(std::string listen_address = "0.0.0.0", uint16_t listen_port = 5062);
 
-        std::thread run();
-        void stop();
+//        std::thread run();
+//        void stop();
 
-        void reader_thread();
-
-        //uint32_t queue_count();
+//        uint32_t queue_count();
+//        RawMessage queue_front();
+//        void queue_pop();
 
     private:
-        void process_event(ENetEvent * event);
-        uint32_t validate_msg(ShortMsgPending * smp);
-        uint32_t verify_ack(ShortMsgPending * smp);
-        uint32_t verify_msg(ShortMsgPending * smp);
+        void thread() override;
 
-        SmqThreadSafeQueue<ShortMsgPending> m_tsq{};
-        bool m_stop_thread = false;
+//        static std::string get_ip(ENetAddress * event);
 
-        // NOTE: These are being put here so they can be pulled out into the
-        //       configuration at some point.
-        uint32_t m_timeout_ms = 100; // Short timeout to keep the thread responsive.
+//        void process_event(ENetEvent * event);
+//        uint32_t validate_msg(ShortMsgPending * smp);
+//        uint32_t verify_ack(ShortMsgPending * smp);
+//        uint32_t verify_msg(ShortMsgPending * smp);
+
+//        SmqThreadSafeQueue<RawMessage> m_tsq{};
+        //bool m_stop_thread = false;
+
+        //uint32_t m_timeout_ms = 100; // Short timeout to keep the thread responsive.
         uint32_t m_num_connections = 100; // Allow 100 active connections.
 
-        ENetAddress m_net_address{};
-        ENetHost * m_net_server = nullptr;
+        //ENetAddress m_net_address{};
+        //ENetHost * m_net_server = nullptr;
+        //std::string m_local_address;
+        //std::uint16_t m_local_port;
+        //UDPServer * m_udp_server = nullptr;
+
     };
 }
 
