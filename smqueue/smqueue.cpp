@@ -1,7 +1,7 @@
 //#include "smnet.h"
 //#include "smsc.h"
 //#include <time.h>
-#include <osipparser2/osip_message.h>
+//#include <osipparser2/osip_message.h>
 #include <iostream>
 //#include <fstream>
 //#include <cstdlib>			// strtol
@@ -15,7 +15,7 @@
 
 //#undef WARNING
 
-#include <Globals.h>
+//#include <Globals.h>
 
 //#include <Logger.h>
 //#include <Timeval.h>
@@ -733,19 +733,20 @@ int main(int argc, char **argv)
     /*** Parse CLI Arguments ***/
     // TODO: Properly parse and handle any arguments
     //extern const char *gVersionString;
-    const char *gVersionString = "FIXME: Change the way this version stuff works";
+    const char *version_string = "FIXME: Change the way this version stuff works";
     if (argc > 1) {
         for (int argi = 0; argi < argc; argi++) {
             if (!strcmp(argv[argi], "--version") ||
                 !strcmp(argv[argi], "-v")) {
-                cout << gVersionString << endl;
+                cout << version_string << endl;
             }
         }
         return 0;
     }
 
     /*** Parse Config File ***/
-    shared_ptr<cpptoml::table> config = cpptoml::parse_file("/etc/openbts/smqueue.conf"); // FIXME: Get this from a command line arg
+    // FIXME: Get the config file path from a command line arg.
+    shared_ptr<cpptoml::table> config = cpptoml::parse_file("/etc/openbts/smqueue.conf");
     shared_ptr<cpptoml::table> config_smqueue = config->get_table("smqueue");
     shared_ptr<cpptoml::table> config_logging = config->get_table("logging");
     std::string log_level = *config_logging->get_as<std::string>("level");

@@ -97,7 +97,8 @@ namespace kneedeepbts::smqueue {
 //        if (!read_queue_from_file(savefile)) {  // Load queue file on startup
 //            LOG(WARNING) << "Failed to read queue on startup from file " << savefile;
 //        }
-        read_queue_from_file();
+        // FIXME: Should the queue be saved and restored?  If so, update this.
+        //read_queue_from_file();
 
 // Not using mqueue anymore.  Keeping the queue in the application memory.
 //        // Set up Posix message queue limit
@@ -162,20 +163,27 @@ namespace kneedeepbts::smqueue {
         SPDLOG_INFO("Cleaning up after the SmqManager main loop.");
 
         // Wait for the threads to end.
+        SPDLOG_DEBUG("Stopping threads");
         m_reader.stop();
         m_writer.stop();
         m_acker.stop();
+        SPDLOG_DEBUG("Joining reader thread");
         reader_thread.join();
+        SPDLOG_DEBUG("Joining writer thread");
         writer_thread.join();
+        SPDLOG_DEBUG("Joining acker thread");
         acker_thread.join();
+        SPDLOG_DEBUG("All threads done");
 
-        save_queue_to_file();
+        // FIXME: Should the queue be saved and restored?  If so, update this.
+        //save_queue_to_file();
 
         // Free up any OSIP stuff, to make valgrind squeaky clean.
         osip_release(osip);
 
         // Deinitialize the UDP networking library
 //        atexit(enet_deinitialize);
+        SPDLOG_INFO("Leaving the SmqManager main loop.");
     }
 
 
