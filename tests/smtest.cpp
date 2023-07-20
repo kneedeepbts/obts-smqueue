@@ -1,55 +1,49 @@
 #include <doctest/doctest.h>
 
 #include <string>
-#include <cstdlib>
 
-#include <enet/enet.h>
 #include <spdlog/spdlog.h>
+
+#include <sys/socket.h>
+#include <arpa/inet.h> // This contains inet_addr
+#include <unistd.h> // This contains close
+#define INVALID_SOCKET (SOCKET)(~0)
+#define SOCKET_ERROR (-1)
+typedef int SOCKET;
 
 class UdpNetworkingTestFixture {
 public:
     UdpNetworkingTestFixture() {
-        enet_address_set_host(&m_address, m_hostname.c_str());
-        m_address.port = m_port;
-        m_client = enet_host_create(nullptr, 1, 1, 0, 0);
-        m_peer = enet_host_connect(m_client, &m_address, 1, 0);
+        // Create the socket handle
+        m_socket = socket(AF_INET, SOCK_DGRAM, 0);
+        if(m_socket == INVALID_SOCKET) {
+            // FIXME: The rest of this code doesn't throw, should this code here?
+            throw std::runtime_error("Could not create socket");
+        }
+        m_addr.sin_family = AF_INET;
+
+        set_address("127.0.0.1");
+        set_port(5656);
     }
 
-    ~UdpNetworkingTestFixture() {
-        enet_host_destroy(m_client);
-        m_client = nullptr;
-    }
+    ~UdpNetworkingTestFixture() = default;
 
 protected:
-    std::string m_hostname = "127.0.0.1";
-    int m_port = 5064;
-    ENetAddress m_address{};
-    ENetHost * m_client;
-    ENetPeer * m_peer;
+    void set_port(std::uint16_t port) {
+        m_addr.sin_port = htons(port);
+    }
+    int set_address(const std::string& ip_address) {
+        return inet_pton(AF_INET, ip_address.c_str(), &m_addr.sin_addr);
+    }
+
+    SOCKET m_socket;
+    sockaddr_in m_addr{};
 };
 
 // FIXME: Should this test grab the IP Address and Port from the smqueue.conf?
 
 TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the server (reader)") {
-    REQUIRE((m_client != nullptr));
-    REQUIRE((m_peer != nullptr));
-
-    ENetEvent event;
-    ENetPacket * packet;
-    if(enet_host_service(m_client, &event, 2000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
-        SPDLOG_INFO("Connection to {}:{} succeeded.", m_hostname, m_port);
-    }
-    else
-    {
-        // NOTE: Two seconds are up or a disconnect event was received.  Reset the peer.
-        enet_peer_reset(m_peer);
-        SPDLOG_ERROR("Connection to {}:{} failed.", m_hostname, m_port);
-    }
-
-    // Wait before sending packet to see if the connection or the send causes the segfault.
-    sleep(1);
-    enet_host_service(m_client, &event, 2000);
-    sleep(1);
+    REQUIRE((m_socket > 0));
 
     // Send a short message
     static const char form[] =
@@ -63,9 +57,16 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
         "Content-Type: text/plain\n" \
         "Content-Length: 4\n"
         "\ntest\n";
-    packet = enet_packet_create(form, strlen(form) + 1, ENET_PACKET_FLAG_UNSEQUENCED);
-    enet_peer_send(m_peer, 0, packet);
-    enet_host_flush(m_client);
+
+    // Create the address and peer
+    sockaddr_in to_addr{};
+    to_addr.sin_family = AF_INET;
+    inet_pton(AF_INET, "127.0.0.1", &to_addr.sin_addr);
+    to_addr.sin_port = htons(5060);
+
+    // Send the message
+    // FIXME: Error handling?
+    sendto(m_socket, form, strlen(form), 0, reinterpret_cast<sockaddr*>(&to_addr), sizeof(to_addr));
     SPDLOG_INFO("Packet Sent");
 
     int i = 5;

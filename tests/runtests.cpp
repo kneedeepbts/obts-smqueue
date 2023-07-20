@@ -1,7 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
-#include <enet/enet.h>
 #include <spdlog/spdlog.h>
 
 int main(int argc, char** argv) {
@@ -13,14 +12,7 @@ int main(int argc, char** argv) {
 
     context.applyCommandLine(argc, argv);
 
-    if(enet_initialize() != 0) {
-        SPDLOG_ERROR("Failed to initialize UDP networking library.");
-        return -1;
-    }
-
     int res = context.run();
-
-    atexit(enet_deinitialize);
 
     if(context.shouldExit()) {
         return res;

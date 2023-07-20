@@ -3,9 +3,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <fstream>
-#include <utility>
-
-//#include <enet/enet.h>
+//#include <utility>
 
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_DEBUG
 #include "spdlog/spdlog.h"
@@ -20,12 +18,6 @@ namespace kneedeepbts::smqueue {
           m_acker(&m_reader, &m_writer) {}
 
     void SmqManager::run() {
-        // Initialize the UDP network library
-//        if(enet_initialize() != 0) {
-//            SPDLOG_ERROR("Failed to initialize the UDP networking library.");
-//            return; // Bail out now.
-//        }
-
         // Initialize the OSIP library
         if(osip_init(&osip) != 0) {
             SPDLOG_ERROR("Failed to initialize the OSIP library.");
@@ -181,86 +173,10 @@ namespace kneedeepbts::smqueue {
         // Free up any OSIP stuff, to make valgrind squeaky clean.
         osip_release(osip);
 
-        // Deinitialize the UDP networking library
-//        atexit(enet_deinitialize);
         SPDLOG_INFO("Leaving the SmqManager main loop.");
     }
 
-
-
-//    void SmqManager::InitBeforeMainLoop() {
-//        //m_NodeManager.start(45063);
-//
-//        //please_re_exec = false;
-//        stop_main_loop = false;
-//        //reexec_smqueue = false;
-//
-//        // Open the CDR file for appending.
-//        std::string CDRFilePath = *m_config->get_as<std::string>("cdrfile");
-//        if (CDRFilePath.length()) {
-//            m_cdrfile = fopen(CDRFilePath.c_str(),"a");
-//            if (!m_cdrfile) {
-//                SPDLOG_ERROR("CDR file at {} could not be created or opened! errno ({}) {}", CDRFilePath.c_str(), errno, strerror(errno));
-//            }
-//        }
-//
-//        // Set up short-code commands users can type
-//        // FIXME: Clean these up and re-apply.
-//        //init_smcommands(&short_code_map);
-//
-//        // NOTE: Not going to worry about setting timeouts from the configuration file right now.
-////        if (gConfig.defines("SIP.Timeout.MessageResend")) {
-////            int int1 = gConfig.getNum("SIP.Timeout.MessageResend");
-////            LOG(DEBUG) << "Set SIP.Timeout.MessageResend value " <<  int1;
-////            // timeouts_REQUEST_MSG_DELIVERY[REQUEST_DESTINATION_SIPURL] = int1;  // svgfix
-////        }
-////
-////        if (gConfig.defines("SIP.Timeout.MessageBounce")) {
-////            int int2 = gConfig.getNum("SIP.Timeout.MessageBounce");
-////            LOG(DEBUG) << "Set SIP.Timeout.MessageBounce value " <<  int2;
-////            timeouts_REQUEST_DESTINATION_IMSI[DELETE_ME_STATE] = int2;
-////        }
-//
-//        //LOG(DEBUG) << "REQUEST_DESTINATION_SIPURL value " << REQUEST_DESTINATION_SIPURL;
-//        //LOG(DEBUG) << "Timeout from 8 to 11 " << *SMqueue::timeouts[REQUEST_MSG_DELIVERY][REQUEST_DESTINATION_SIPURL];
-//        //LOG(DEBUG) << "Timeout from 11 to 8 " << *SMqueue::timeouts[REQUEST_DESTINATION_SIPURL][REQUEST_MSG_DELIVERY];
-//
-//
-//        // Port number that we (smqueue) listen on.
-//        //if (init_listener(gConfig.getStr("SIP.myPort").c_str())) {
-//        if (my_network.listen_on_port(*m_config->get_as<std::string>("port"))) {
-//            SPDLOG_INFO("Got VALID port for smqueue to listen on");
-//        } else {
-//            SPDLOG_ERROR("Failed to get port for smqueue to listen on");
-//        }
-//
-//        // Restore message queue
-////        savefile = gConfig.getStr("savefile").c_str();
-////        // Load queue on start up
-////        if (!read_queue_from_file(savefile)) {  // Load queue file on startup
-////            LOG(WARNING) << "Failed to read queue on startup from file " << savefile;
-////        }
-//        read_queue_from_file();
-//
-//        // Set up Posix message queue limit
-//        // FIXME: Should move from mqueue, which appears to be kernel based, to an in-memory queue.
-//        FILE * gTempFile = nullptr;
-//        int xTemp;
-//        gTempFile = fopen("/proc/sys/fs/mqueue/msg_max","r");
-//        if (!gTempFile) {
-//            SPDLOG_WARN("Could not open '/proc/sys/fs/mqueue/msg_max', errno ({}) {}", errno, strerror(errno));
-////        } else {
-////            xTemp = fprintf(gTempFile,"%d", MQ_MAX_NUM_OF_MESSAGES);
-////            if (xTemp == 0){
-////                LOG(ALERT) << "Could not write to " << "/proc/sys/fs/mqueue/msg_max, errno " << errno << " " << strerror(errno) << endl;
-////            }
-//        }
-//        fclose(gTempFile);
-//    }
-
-
-
-
+// ### OLD CODE BELOW ####################################################### //
 
     void increase_acked_msg_timeout(ShortMsgPending *msg) {
         time_t timeout = SmqManager::INCREASEACKEDMSGTMOMS;
