@@ -62,7 +62,7 @@ TEST_CASE_FIXTURE(UdpNetworkingTestFixture, "Sending a good short message to the
     sockaddr_in to_addr{};
     to_addr.sin_family = AF_INET;
     inet_pton(AF_INET, "127.0.0.1", &to_addr.sin_addr);
-    to_addr.sin_port = htons(5060);
+    to_addr.sin_port = htons(5064);
 
     // Send the message
     // FIXME: Error handling?
