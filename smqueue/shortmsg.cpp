@@ -58,14 +58,12 @@ namespace kneedeepbts::smqueue {
             // Most likely this is SIP response.
             content_type = UNSUPPORTED_CONTENT;
             // SVG Consider not continuing
-        } else if (  strcmp(parsed->content_type->type, "text") == 0
-                     && strcmp(parsed->content_type->subtype, "plain") == 0)
+        } else if ( strcmp(parsed->content_type->type, "text") == 0 && strcmp(parsed->content_type->subtype, "plain") == 0)
         {
             // If Content-Type is text/plain, then no decoding is needed.
             content_type = TEXT_PLAIN;
             //LOG(DEBUG) << "SMS message encoded text";
-        } else if (  strcmp(parsed->content_type->type, "application") == 0
-                     && strcmp(parsed->content_type->subtype, "vnd.3gpp.sms") == 0)
+        } else if ( strcmp(parsed->content_type->type, "application") == 0 && strcmp(parsed->content_type->subtype, "vnd.3gpp.sms") == 0)
         {
             // This is an encoded SMS' TPDU.
             SPDLOG_DEBUG("SMS message encoded 3GPP");

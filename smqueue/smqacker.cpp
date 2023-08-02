@@ -8,15 +8,6 @@
 #include <osipparser2/osip_message.h>
 
 namespace kneedeepbts::smqueue {
-//    std::thread SmqAcker::run() {
-//        return std::thread(&SmqAcker::thread, this);
-//    }
-//
-//    void SmqAcker::stop() {
-//        SPDLOG_DEBUG("Stopping thread.");
-//        m_stop_thread = true;
-//    }
-
     void SmqAcker::thread() {
         SPDLOG_DEBUG("Starting the acker thread");
 

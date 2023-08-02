@@ -22,16 +22,16 @@ using namespace GSM;
 using namespace std;
 
 
-ostream& GSM::operator<<(ostream& os, L3PD val)
-{
-	switch (val) {
-		case L3CallControlPD: os << "Call Control"; break;
-		case L3MobilityManagementPD: os << "Mobility Management"; break;
-		case L3RadioResourcePD: os << "Radio Resource"; break;
-		default: os << hex << "0x" << (int)val << dec;
-	}
-	return os;
-}
+//ostream& GSM::operator<<(ostream& os, L3PD val)
+//{
+//	switch (val) {
+//		case L3CallControlPD: os << "Call Control"; break;
+//		case L3MobilityManagementPD: os << "Mobility Management"; break;
+//		case L3RadioResourcePD: os << "Radio Resource"; break;
+//		default: os << hex << "0x" << (int)val << dec;
+//	}
+//	return os;
+//}
 
 
 unsigned char GSM::encodeGSMChar(unsigned char ascii)
@@ -115,46 +115,46 @@ ostream& GSM::operator<<(ostream& os, MobileIDType wID)
 
 
 
-bool Z100Timer::expired() const
-{
-	assert(mLimitTime!=0);
-	// A non-active timer does not expire.
-	if (!mActive) return false;
-	return mEndTime.passed();
-}
-
-void Z100Timer::set()
-{
-	assert(mLimitTime!=0);
-	mEndTime = Timeval(mLimitTime);
-	mActive=true;
-} 
-
-void Z100Timer::expire()
-{
-	mEndTime = Timeval(0);
-	mActive=true;
-} 
-
-
-void Z100Timer::set(long wLimitTime)
-{
-	mLimitTime = wLimitTime;
-	set();
-} 
-
-
-long Z100Timer::remaining() const
-{
-	if (!mActive) return 0;
-	long rem = mEndTime.remaining();
-	if (rem<0) rem=0;
-	return rem;
-}
-
-void Z100Timer::wait() const
-{
-	while (!expired()) msleep(remaining());
-}
+//bool Z100Timer::expired() const
+//{
+//	assert(mLimitTime!=0);
+//	// A non-active timer does not expire.
+//	if (!mActive) return false;
+//	return mEndTime.passed();
+//}
+//
+//void Z100Timer::set()
+//{
+//	assert(mLimitTime!=0);
+//	mEndTime = Timeval(mLimitTime);
+//	mActive=true;
+//}
+//
+//void Z100Timer::expire()
+//{
+//	mEndTime = Timeval(0);
+//	mActive=true;
+//}
+//
+//
+//void Z100Timer::set(long wLimitTime)
+//{
+//	mLimitTime = wLimitTime;
+//	set();
+//}
+//
+//
+//long Z100Timer::remaining() const
+//{
+//	if (!mActive) return 0;
+//	long rem = mEndTime.remaining();
+//	if (rem<0) rem=0;
+//	return rem;
+//}
+//
+//void Z100Timer::wait() const
+//{
+//	while (!expired()) msleep(remaining());
+//}
 
 // vim: ts=4 sw=4

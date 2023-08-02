@@ -118,87 +118,85 @@ std::ostream& operator<<(std::ostream& os, MobileIDType);
 
 
 
-/**
- L3 Protocol Discriminator, GSM 04.08 10.2, GSM 04.07 11.2.3.1.1.
-*/
-enum L3PD {
-	L3GroupCallControlPD=0x00,
-	L3BroadcastCallControlPD=0x01,
-	L3PDSS1PD=0x02,
-	L3CallControlPD=0x03,
-	L3PDSS2PD=0x04,
-	L3MobilityManagementPD=0x05,
-	L3RadioResourcePD=0x06,
-	L3MobilityManagementGPRSPD=0x08,
-	L3SMSPD=0x09,
-	L3GPRSSessionManagementPD=0x0a,
-	L3NonCallSSPD=0x0b,
-	L3LocationPD=0x0c,
-	L3ExtendedPD=0x0e,
-	L3TestProcedurePD=0x0f,
-	L3UndefinedPD=-1
-};
-
-
-
-std::ostream& operator<<(std::ostream& os, L3PD val);
+///**
+// L3 Protocol Discriminator, GSM 04.08 10.2, GSM 04.07 11.2.3.1.1.
+//*/
+//enum L3PD {
+//	L3GroupCallControlPD=0x00,
+//	L3BroadcastCallControlPD=0x01,
+//	L3PDSS1PD=0x02,
+//	L3CallControlPD=0x03,
+//	L3PDSS2PD=0x04,
+//	L3MobilityManagementPD=0x05,
+//	L3RadioResourcePD=0x06,
+//	L3MobilityManagementGPRSPD=0x08,
+//	L3SMSPD=0x09,
+//	L3GPRSSessionManagementPD=0x0a,
+//	L3NonCallSSPD=0x0b,
+//	L3LocationPD=0x0c,
+//	L3ExtendedPD=0x0e,
+//	L3TestProcedurePD=0x0f,
+//	L3UndefinedPD=-1
+//};
+//
+//std::ostream& operator<<(std::ostream& os, L3PD val);
 
 
 
 
-/**
-	CCITT Z.100 activity timer, as described in GSM 04.06 5.1.
-	All times are in milliseconds.
-*/
-class Z100Timer {
-
-	private:
-
-	Timeval mEndTime;		///< the time at which this timer will expire
-	long mLimitTime;		///< timeout in milliseconds
-	bool mActive;			///< true if timer is active
-
-	public:
-
-	/** Create a timer with a given timeout in milliseconds. */
-	Z100Timer(long wLimitTime)
-		:mLimitTime(wLimitTime),
-		mActive(false)
-	{}
-
-	/** Blank constructor; if you use this object, it will assert. */
-	Z100Timer():mLimitTime(0),mActive(false) {}
-
-	/** True if the timer is active and expired. */
-	bool expired() const;
-
-	/** Force the timer into an expired state. */
-	void expire();
-
-	/** Start or restart the timer. */
-	void set();
-
-	/** Start or restart the timer, possibly specifying a new limit. */
-	void set(long wLimitTime);
-
-	/** Stop the timer. */
-	void reset() { assert(mLimitTime!=0); mActive = false; }
-
-	/** Returns true if the timer is active. */
-	bool active() const { return mActive; }
-
-	/**
-		Remaining time until expiration, in milliseconds.
-		Returns zero if the timer has expired.
-	*/
-	long remaining() const;
-
-	/**
-		Block until the timer expires.
-		Returns immediately if the timer is not running.
-	*/
-	void wait() const;
-};
+///**
+//	CCITT Z.100 activity timer, as described in GSM 04.06 5.1.
+//	All times are in milliseconds.
+//*/
+//class Z100Timer {
+//
+//	private:
+//
+//	Timeval mEndTime;		///< the time at which this timer will expire
+//	long mLimitTime;		///< timeout in milliseconds
+//	bool mActive;			///< true if timer is active
+//
+//	public:
+//
+//	/** Create a timer with a given timeout in milliseconds. */
+//	Z100Timer(long wLimitTime)
+//		:mLimitTime(wLimitTime),
+//		mActive(false)
+//	{}
+//
+//	/** Blank constructor; if you use this object, it will assert. */
+//	Z100Timer():mLimitTime(0),mActive(false) {}
+//
+//	/** True if the timer is active and expired. */
+//	bool expired() const;
+//
+//	/** Force the timer into an expired state. */
+//	void expire();
+//
+//	/** Start or restart the timer. */
+//	void set();
+//
+//	/** Start or restart the timer, possibly specifying a new limit. */
+//	void set(long wLimitTime);
+//
+//	/** Stop the timer. */
+//	void reset() { assert(mLimitTime!=0); mActive = false; }
+//
+//	/** Returns true if the timer is active. */
+//	bool active() const { return mActive; }
+//
+//	/**
+//		Remaining time until expiration, in milliseconds.
+//		Returns zero if the timer has expired.
+//	*/
+//	long remaining() const;
+//
+//	/**
+//		Block until the timer expires.
+//		Returns immediately if the timer is not running.
+//	*/
+//	void wait() const;
+//};
 
 
 

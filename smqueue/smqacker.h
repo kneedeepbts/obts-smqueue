@@ -16,9 +16,6 @@ namespace kneedeepbts::smqueue {
     public:
         SmqAcker(SmqReader * reader, SmqWriter * writer) : SmqThread(), m_reader(reader), m_writer(writer) {}
 
-//        std::thread run();
-//        void stop();
-
         uint32_t queue_count();
         ShortMsgPending queue_front();
         void queue_pop();
@@ -37,8 +34,6 @@ namespace kneedeepbts::smqueue {
         SmqWriter * m_writer;
 
         SmqThreadSafeQueue<ShortMsgPending> m_tsq{};
-//        bool m_stop_thread = false;
-//        uint32_t m_timeout_ms = 100; // Short timeout to keep the thread responsive.
     };
 }
 

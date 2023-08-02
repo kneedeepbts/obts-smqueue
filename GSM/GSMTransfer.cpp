@@ -27,30 +27,30 @@ using namespace GSM;
 
 
 
-ostream& GSM::operator<<(ostream& os, const L3Frame& frame)
-{
-	os << "primitive=" << frame.primitive();
-	os << " raw=(";
-	frame.hex(os);
-	os << ")";
-	return os;
-}
+//ostream& GSM::operator<<(ostream& os, const L3Frame& frame)
+//{
+//	os << "primitive=" << frame.primitive();
+//	os << " raw=(";
+//	frame.hex(os);
+//	os << ")";
+//	return os;
+//}
 
 
 
-ostream& GSM::operator<<(ostream& os, Primitive prim)
-{
-	switch (prim) {
-		case ESTABLISH: os << "ESTABLISH"; break;
-		case RELEASE: os << "RELEASE"; break;
-		case DATA: os << "DATA"; break;
-		case UNIT_DATA: os << "UNIT_DATA"; break;
-		case ERROR: os << "ERROR"; break;
-		case HARDRELEASE: os << "HARDRELEASE"; break;
-		default: os << "?" << (int)prim << "?";
-	}
-	return os;
-}
+//ostream& GSM::operator<<(ostream& os, Primitive prim)
+//{
+//	switch (prim) {
+//		case ESTABLISH: os << "ESTABLISH"; break;
+//		case RELEASE: os << "RELEASE"; break;
+//		case DATA: os << "DATA"; break;
+//		case UNIT_DATA: os << "UNIT_DATA"; break;
+//		case ERROR: os << "ERROR"; break;
+//		case HARDRELEASE: os << "HARDRELEASE"; break;
+//		default: os << "?" << (int)prim << "?";
+//	}
+//	return os;
+//}
 
 
 
